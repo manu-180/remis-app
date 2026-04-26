@@ -1,0 +1,25 @@
+{
+  "name": "@remis/design-system",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tailwind": "./src/tailwind-preset.ts",
+    "./css": "./src/css/tokens.css"
+  },
+  "files": ["src", "flutter", "tokens.json"],
+  "scripts": {
+    "build": "tsx build/build.ts && dart run build/flutter_build.dart",
+    "build:web": "tsx build/build.ts",
+    "build:flutter": "dart run build/flutter_build.dart",
+    "dev": "tsx watch build/build.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "style-dictionary": "^4.2.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "culori": "^4.0.1"
+  }
+}
