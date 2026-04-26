@@ -1,0 +1,4 @@
+packages:
+  - 'apps/dispatcher'
+  - 'apps/web'
+  - 'packages/*'

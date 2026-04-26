@@ -1,0 +1,91 @@
+# ───────── deps ─────────
+node_modules/
+.pnpm-store/
+
+# ───────── Next.js / Vercel ─────────
+.next/
+out/
+.vercel/
+next-env.d.ts
+
+# ───────── Build outputs ─────────
+dist/
+build/
+.turbo/
+coverage/
+
+# ───────── Flutter / Dart ─────────
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+**/*.g.dart
+**/*.freezed.dart
+**/*.config.dart
+**/*.gr.dart
+**/*.mocks.dart
+**/ios/Pods/
+**/ios/Flutter/Flutter.framework/
+**/ios/Flutter/Flutter.podspec
+**/ios/.symlinks/
+**/ios/Runner.xcworkspace/xcuserdata/
+**/ios/Runner.xcodeproj/xcuserdata/
+**/android/.gradle/
+**/android/app/build/
+**/android/captures/
+**/android/local.properties
+**/android/key.properties
+**/android/**/GeneratedPluginRegistrant.java
+**/linux/flutter/ephemeral/
+**/macos/Flutter/ephemeral/
+**/windows/flutter/ephemeral/
+
+# ───────── Supabase ─────────
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+supabase/.env.local
+**/supabase/.env
+
+# ───────── Secrets / env ─────────
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.keystore
+*.jks
+google-services.json
+GoogleService-Info.plist
+
+# ───────── IDE ─────────
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.iml
+
+# ───────── OS ─────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ───────── Logs ─────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ───────── Misc ─────────
+*.tsbuildinfo
+.cache/
+.eslintcache
+
+# ───────── Session state local (no commitear) ─────────
+.remember/
+.claude/
+CLAUDE.local.md

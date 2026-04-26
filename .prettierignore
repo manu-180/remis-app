@@ -1,0 +1,31 @@
+# Build outputs
+**/.next/**
+**/dist/**
+**/build/**
+**/out/**
+**/.turbo/**
+**/coverage/**
+
+# Deps
+**/node_modules/**
+
+# Flutter
+**/.dart_tool/**
+**/ios/Pods/**
+**/android/.gradle/**
+**/*.g.dart
+**/*.freezed.dart
+
+# Lockfiles
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Generated
+**/.gitkeep
+
+# Docs escritos a mano (fuente de verdad — no auto-formatear)
+docs/**
+
+# Memoria de sesión
+.remember/**
