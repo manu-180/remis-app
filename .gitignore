@@ -89,3 +89,6 @@ lerna-debug.log*
 .remember/
 .claude/
 CLAUDE.local.md
+
+# ───────── Git worktrees ─────────
+.worktrees/
