@@ -11,26 +11,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  format:
-    name: Prettier format check
+  lint-js:
+    name: JS/TS lint + format
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: 9.15.0
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
 
-      - name: Check formatting
-        run: pnpm format:check
+      - run: pnpm format:check
+
+      - run: pnpm -r lint
+
+  lint-flutter:
+    name: Flutter analyze (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [driver, passenger]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - run: cd apps/${{ matrix.app }} && flutter pub get && flutter analyze
+
+  lint-deno:
+    name: Deno lint + format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+
+      - run: cd supabase/functions && deno lint && deno fmt --check

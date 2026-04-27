@@ -1,0 +1,80 @@
+name: Deploy Mobile
+
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'App to deploy'
+        required: true
+        type: choice
+        options: [driver, passenger]
+      track:
+        description: 'Release track'
+        required: true
+        type: choice
+        options: [internal, beta, production]
+
+jobs:
+  android:
+    name: Android — ${{ inputs.app }} → ${{ inputs.track }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: apps/${{ inputs.app }}/android
+
+      - run: cd apps/${{ inputs.app }} && flutter pub get
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > /tmp/keystore.jks
+
+      - name: Build & upload to Play Store
+        working-directory: apps/${{ inputs.app }}/android
+        env:
+          PLAY_STORE_CONFIG_JSON: ${{ secrets.PLAY_STORE_CONFIG_JSON }}
+          ANDROID_KEYSTORE_PATH: /tmp/keystore.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: bundle exec fastlane ${{ inputs.track }}
+
+  ios:
+    name: iOS — ${{ inputs.app }} → ${{ inputs.track }}
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: apps/${{ inputs.app }}/ios
+
+      - run: cd apps/${{ inputs.app }} && flutter pub get
+
+      - name: Build & upload to App Store / TestFlight
+        working-directory: apps/${{ inputs.app }}/ios
+        env:
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+        run: |
+          lane="${{ inputs.track }}"
+          [ "$lane" = "internal" ] && lane="testflight_internal"
+          [ "$lane" = "beta" ] && lane="testflight_beta"
+          bundle exec fastlane $lane
