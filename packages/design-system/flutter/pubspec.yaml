@@ -1,0 +1,18 @@
+name: remis_design_system
+description: Design system shared by driver and passenger Flutter apps.
+publish_to: none
+version: 0.0.0
+
+environment:
+  sdk: ^3.5.0
+  flutter: ^3.27.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
