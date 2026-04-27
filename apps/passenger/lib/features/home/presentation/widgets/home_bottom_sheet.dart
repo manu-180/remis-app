@@ -10,10 +10,15 @@ class HomeBottomSheet extends StatefulWidget {
     super.key,
     required this.pickupLocation,
     required this.onDestinationSelected,
+    this.onSearchTap,
   });
 
   final LatLng? pickupLocation;
   final ValueChanged<String> onDestinationSelected;
+
+  /// When provided, tapping the "¿A dónde vamos?" bar in collapsed state
+  /// calls this callback instead of expanding the sheet.
+  final VoidCallback? onSearchTap;
 
   @override
   State<HomeBottomSheet> createState() => _HomeBottomSheetState();
@@ -94,6 +99,7 @@ class _HomeBottomSheetState extends State<HomeBottomSheet>
             widget.onDestinationSelected(_destinationCtrl.text.trim());
           },
           onDestinationChanged: (_) => setState(() {}),
+          onSearchTap: widget.onSearchTap,
         ),
       ),
     );
@@ -112,6 +118,7 @@ class _SheetContent extends StatelessWidget {
     required this.onScheduleToggle,
     required this.onRequestRide,
     required this.onDestinationChanged,
+    this.onSearchTap,
   });
 
   final _SheetStop stop;
@@ -124,6 +131,7 @@ class _SheetContent extends StatelessWidget {
   final VoidCallback onScheduleToggle;
   final VoidCallback onRequestRide;
   final ValueChanged<String> onDestinationChanged;
+  final VoidCallback? onSearchTap;
 
   @override
   Widget build(BuildContext context) {
@@ -196,7 +204,9 @@ class _SheetContent extends StatelessWidget {
                 children: [
                   // ── Stop collapsed: "¿A dónde vamos?" + chips frecuentes ──
                   GestureDetector(
-                    onTap: stop == _SheetStop.collapsed ? onExpand : null,
+                    onTap: stop == _SheetStop.collapsed
+                        ? (onSearchTap ?? onExpand)
+                        : null,
                     child: Container(
                       height: 52,
                       padding: const EdgeInsets.symmetric(horizontal: 16),

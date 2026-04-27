@@ -10,6 +10,11 @@ import 'package:remis_flutter_core/flutter_core.dart';
 import '../../../../core/mock_auth.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../ride_request/data/models/destination_result.dart';
+import '../../../ride_request/data/models/ride_model.dart';
+import '../../../ride_request/data/ride_providers.dart';
+import '../../../ride_request/presentation/screens/destination_search_screen.dart';
+import '../../../ride_request/presentation/widgets/ride_confirmation_sheet.dart';
 import '../widgets/home_bottom_sheet.dart';
 import '../widgets/map_style.dart';
 
@@ -33,6 +38,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
     _checkExistingPermission();
+    _checkActiveRide();
   }
 
   Future<void> _checkExistingPermission() async {
@@ -44,6 +50,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         _locationPermissionGranted = true;
       });
       _fetchCurrentLocation();
+    }
+  }
+
+  Future<void> _checkActiveRide() async {
+    final activeRide = await ref.read(activeRideFutureProvider.future);
+    if (!mounted) return;
+    if (activeRide == null) return;
+    // Navigate to the appropriate screen based on the ride's current status.
+    switch (activeRide.status) {
+      case RideStatus.requested:
+        context.go(AppRoutes.waiting, extra: activeRide.id);
+      case RideStatus.assigned:
+      case RideStatus.enRouteToPickup:
+      case RideStatus.waitingPassenger:
+      case RideStatus.onTrip:
+        context.go(AppRoutes.tracking, extra: activeRide);
+      default:
+        break; // Terminal status — stay on home
     }
   }
 
@@ -78,6 +102,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _onDisclosureDismiss() => setState(() => _showDisclosure = false);
+
+  void _openDestinationSearch() {
+    Navigator.push<DestinationResult>(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => DestinationSearchScreen(
+          onDestinationSelected: (result) {
+            Navigator.pop(context); // close destination search
+            _onDestinationSelected(result);
+          },
+        ),
+      ),
+    );
+  }
+
+  void _onDestinationSelected(DestinationResult dest) {
+    final pickup = _pickupLocation;
+    if (pickup == null) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => RideConfirmationSheet(
+        pickup: pickup,
+        dest: dest,
+        pickupAddress: 'Mi ubicación',
+        onRideCreated: (ride) {
+          if (!mounted) return;
+          context.go(AppRoutes.waiting, extra: ride.id);
+        },
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -180,9 +240,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           // ── Bottom sheet (3 stops) ──
           HomeBottomSheet(
             pickupLocation: _pickupLocation,
-            onDestinationSelected: (dest) {
-              // Tanda 3B: ride request logic
-            },
+            onSearchTap: _pickupLocation != null ? _openDestinationSearch : null,
+            onDestinationSelected: (_) {}, // Legacy callback — unused now
           ),
         ],
       ),
