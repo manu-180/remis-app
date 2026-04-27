@@ -14,7 +14,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .from('profiles')
     .select('role')
     .eq('id', user.id)
-    .single();
+    .single() as { data: { role: string } | null; error: unknown };
 
   if (!profile || !['dispatcher', 'admin'].includes(profile.role)) {
     redirect('/login');

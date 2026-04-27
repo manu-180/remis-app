@@ -28,7 +28,7 @@ export default function LoginPage() {
         .from('profiles')
         .select('role')
         .eq('id', data.user.id)
-        .single();
+        .single() as { data: { role: string } | null; error: unknown };
 
       if (!profile || !['dispatcher', 'admin'].includes(profile.role)) {
         await supabase.auth.signOut();

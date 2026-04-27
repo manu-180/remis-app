@@ -13,7 +13,7 @@ export function CommandPalette() {
   const open       = useUIStore((s) => s.openCommandPalette);
   const setDensity = useUIStore((s) => s.setDensity);
 
-  useHotkeys('mod+k', (e) => { e.preventDefault(); isOpen ? close() : open(); });
+  useHotkeys('mod+k', (e) => { e.preventDefault(); if (isOpen) { close(); } else { open(); } });
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
