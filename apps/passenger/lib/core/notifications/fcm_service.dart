@@ -70,6 +70,7 @@ class FcmService {
 
   final SupabaseClient _client;
   NotificationTapHandler? _onTap;
+  bool _initialized = false;
 
   /// Register a handler that is called when the user taps a notification.
   void setOnTap(NotificationTapHandler handler) => _onTap = handler;
@@ -86,6 +87,9 @@ class FcmService {
   ///   3. Add google-services.json (Android) & GoogleService-Info.plist (iOS)
   ///   4. Uncomment the implementation block below and remove the stub body.
   Future<void> initialize() async {
+    if (_initialized) return;
+    _initialized = true;
+
     if (_client.auth.currentUser == null) {
       debugPrint('[FcmService] User not authenticated — skipping FCM init.');
       return;
@@ -179,7 +183,13 @@ class FcmService {
     }
 
     debugPrint('[FcmService] Notification tapped — type: $type, ride: $rideId');
-    _onTap?.call(type, rideId);
+    if (type != null && rideId != null && _onTap != null) {
+      try {
+        _onTap!(type, rideId);
+      } catch (e) {
+        debugPrint('[FcmService] Notification tap handler error: $e');
+      }
+    }
   }
 }
 

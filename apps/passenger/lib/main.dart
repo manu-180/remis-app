@@ -43,16 +43,20 @@ class _FcmInitObserver extends ProviderObserver {
   ) {
     // Initialise FCM exactly once, when the fcmServiceProvider is first read.
     if (provider == fcmServiceProvider) {
-      final fcmService = container.read(fcmServiceProvider);
-      final router    = container.read(appRouterProvider);
+      try {
+        final fcmService = container.read(fcmServiceProvider);
+        final router    = container.read(appRouterProvider);
 
-      fcmService.setOnTap((type, rideId) {
-        handleNotificationTap(type: type, rideId: rideId, router: router);
-      });
+        fcmService.setOnTap((type, rideId) {
+          handleNotificationTap(type: type, rideId: rideId, router: router);
+        });
 
-      // Deferred: initialize() is a stub now; becomes real in tanda-4.
-      // It guards internally against unauthenticated state.
-      fcmService.initialize();
+        // Deferred: initialize() is a stub now; becomes real in tanda-4.
+        // It guards internally against unauthenticated state.
+        fcmService.initialize();
+      } catch (e) {
+        debugPrint('[FcmService] FCM init failed: $e');
+      }
     }
   }
 }
