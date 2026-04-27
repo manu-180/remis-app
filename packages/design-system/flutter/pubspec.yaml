@@ -1,5 +1,5 @@
 name: remis_design_system
-description: Design tokens and theme for the remis app (stub — Tanda 1B will expand)
+description: Design system shared by driver and passenger Flutter apps.
 version: 0.1.0
 publish_to: none
 

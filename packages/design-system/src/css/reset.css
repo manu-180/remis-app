@@ -1,0 +1,164 @@
+/**
+ * @remis/design-system — Opinionated CSS Reset
+ *
+ * Inspired by Andy Bell's "A Modern CSS Reset"
+ * https://piccalil.li/blog/a-modern-css-reset/
+ *
+ * CSS custom properties reference tokens defined in tokens.css.
+ * Fallback values are included so this file can be used standalone.
+ *
+ * @version 1.0.0
+ */
+
+/* ─── Box sizing ─────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* ─── Root defaults ──────────────────────────────────────────────────────── */
+
+html {
+  scrollbar-gutter: stable;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* ─── Body defaults ──────────────────────────────────────────────────────── */
+
+body {
+  min-height: 100dvh;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: var(--line-height-normal, 1.5);
+  font-family: var(--font-family-body, system-ui, sans-serif);
+  color: var(--neutral-800, #27272a);
+  background-color: var(--neutral-0, #ffffff);
+}
+
+/* ─── Remove default margins and padding ────────────────────────────────── */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+figure,
+blockquote,
+dl,
+dd,
+fieldset,
+legend {
+  margin: 0;
+  padding: 0;
+}
+
+/* ─── Heading size reset ─────────────────────────────────────────────────── */
+/*
+ * Headings inherit their size from the cascade / utility classes.
+ * The typographic scale lives in token vars (--text-*), not the UA stylesheet.
+ */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-size: 1em;
+  font-weight: inherit;
+}
+
+/* ─── List reset (accessibility-scoped) ─────────────────────────────────── */
+/*
+ * Only strip list styles when the author explicitly marks the element with
+ * role="list", signalling that list semantics are preserved another way.
+ */
+
+ul[role="list"],
+ol[role="list"] {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ─── Media defaults ─────────────────────────────────────────────────────── */
+
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-inline-size: 100%;
+}
+
+/* ─── Form element font inheritance ─────────────────────────────────────── */
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+/* ─── Overflow-wrap ──────────────────────────────────────────────────────── */
+
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  overflow-wrap: break-word;
+}
+
+/* ─── Anchor reset ───────────────────────────────────────────────────────── */
+
+a {
+  color: inherit;
+  text-decoration-skip-ink: auto;
+}
+
+/* ─── Table reset ────────────────────────────────────────────────────────── */
+
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+/* ─── Focus management ───────────────────────────────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--brand-primary, #1b2a4e);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ─── Hidden attribute ───────────────────────────────────────────────────── */
+
+[hidden] {
+  display: none !important;
+}
+
+/* ─── Reduced motion ─────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
