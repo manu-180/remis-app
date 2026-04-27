@@ -1,0 +1,137 @@
+/* TODO: migrar a @import "@remis/design-system/css/tokens.css" cuando Tanda 1B esté completa */
+/* NOTE: @config omitido intencionalmente — Tailwind v4 CSS-first no requiere tailwind.config.ts
+   cuando toda la configuración vive en CSS via @theme / @import. */
+@import "tailwindcss";
+
+/* ── BRAND ────────────────────────────────────────────────── */
+:root {
+  --brand-primary: #1B2A4E;
+  --brand-primary-hover: #243762;
+  --brand-accent: #D97706;
+  --brand-accent-hover: #B45309;
+
+  /* Neutrales light */
+  --neutral-0:   #FFFFFF;
+  --neutral-50:  #FAFAFA;
+  --neutral-100: #F4F4F5;
+  --neutral-200: #E4E4E7;
+  --neutral-300: #D4D4D8;
+  --neutral-400: #A1A1AA;
+  --neutral-500: #71717A;
+  --neutral-600: #52525B;
+  --neutral-700: #3F3F46;
+  --neutral-800: #27272A;
+  --neutral-900: #18181B;
+
+  /* Semánticos */
+  --success:    #16A34A; --success-bg:  #F0FDF4;
+  --warning:    #CA8A04; --warning-bg:  #FEFCE8;
+  --danger:     #DC2626; --danger-bg:   #FEF2F2;
+  --info:       #2563EB; --info-bg:     #EFF6FF;
+
+  /* Tipografía */
+  --text-2xs: 0.625rem;
+  --text-xs:  0.75rem;
+  --text-sm:  0.875rem;
+  --text-base:1rem;
+  --text-md:  1.125rem;
+  --text-lg:  1.25rem;
+  --text-xl:  1.5rem;
+  --text-2xl: 1.875rem;
+  --text-3xl: 2.25rem;
+  --text-4xl: 3rem;
+
+  /* Espaciado */
+  --space-0: 0; --space-2: 0.125rem; --space-4: 0.25rem;
+  --space-6: 0.375rem; --space-8: 0.5rem; --space-12: 0.75rem;
+  --space-16: 1rem; --space-20: 1.25rem; --space-24: 1.5rem;
+  --space-32: 2rem; --space-40: 2.5rem; --space-48: 3rem;
+  --space-64: 4rem;
+
+  /* Radii */
+  --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px;
+  --radius-xl: 16px; --radius-2xl: 24px; --radius-full: 9999px;
+
+  /* Sombras */
+  --shadow-xs: 0 1px 2px rgba(15,23,42,.05);
+  --shadow-sm: 0 1px 3px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04);
+  --shadow-md: 0 4px 6px -1px rgba(15,23,42,.07), 0 2px 4px -2px rgba(15,23,42,.05);
+  --shadow-lg: 0 10px 15px -3px rgba(15,23,42,.08), 0 4px 6px -4px rgba(15,23,42,.05);
+  --shadow-xl: 0 20px 25px -5px rgba(15,23,42,.10), 0 8px 10px -6px rgba(15,23,42,.08);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16,1,0.3,1);
+  --ease-in:  cubic-bezier(0.7,0,0.84,0);
+  --dur-instant: 80ms; --dur-fast: 150ms;
+  --dur-normal: 240ms; --dur-slow: 360ms;
+}
+
+/* Dark mode overrides */
+[data-theme="dark"] {
+  --brand-primary: #7CA0FF;
+  --brand-primary-hover: #9CB7FF;
+  --brand-accent: #F59E0B;
+  --brand-accent-hover: #FBBF24;
+
+  --neutral-0:   #0A0B0F;
+  --neutral-50:  #101218;
+  --neutral-100: #181B23;
+  --neutral-200: #23262F;
+  --neutral-300: #2E323D;
+  --neutral-400: #52576B;
+  --neutral-500: #7B8194;
+  --neutral-600: #A4AABB;
+  --neutral-700: #C7CCDB;
+  --neutral-800: #E4E7EF;
+  --neutral-900: #F4F5F9;
+
+  --success:    #22C55E; --success-bg:  #0E2417;
+  --warning:    #EAB308; --warning-bg:  #1F1B0E;
+  --danger:     #EF4444; --danger-bg:   #27110F;
+  --info:       #60A5FA; --info-bg:     #0E1B2D;
+}
+
+/* ── DENSITY ─────────────────────────────────────────────── */
+[data-density="comfortable"] { --row-height: 56px; --row-padding: 16px; --row-font: 16px; }
+[data-density="compact"]     { --row-height: 44px; --row-padding: 12px; --row-font: 14px; }
+[data-density="dense"]       { --row-height: 32px; --row-padding:  8px; --row-font: 13px; }
+
+/* ── GLOBAL ──────────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--neutral-400) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--neutral-400);
+  border-radius: 4px;
+}
+
+body {
+  background-color: var(--neutral-0);
+  color: var(--neutral-800);
+  font-family: var(--font-family-body, Inter, sans-serif);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Skip link */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 1rem;
+  padding: 0.5rem 1rem;
+  background: var(--brand-accent);
+  color: #000;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  z-index: 9999;
+  transition: top var(--dur-fast) var(--ease-out);
+}
+.skip-link:focus { top: 1rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
