@@ -20,6 +20,13 @@ dependencies:
   device_info_plus: ^11.2.0
   package_info_plus: ^8.1.0
   permission_handler: ^11.3.1
+  flutter_background_geolocation: ^4.16.0
+  flutter_local_notifications: ^18.0.1
+  firebase_core: ^3.8.0
+  firebase_messaging: ^15.1.5
+  disable_battery_optimization: ^1.1.1
+  url_launcher: ^6.3.1
+  shared_preferences: ^2.3.3
   remis_design_system:
     path: ../../packages/design-system/flutter
   remis_flutter_core:
@@ -33,6 +40,7 @@ dev_dependencies:
   freezed: ^2.5.7
   json_serializable: ^6.9.0
   flutter_lints: ^5.0.0
+  mocktail: ^0.3.0
   # custom_lint + riverpod_lint: incompatible with Dart 3.10.x / analyzer 7.6 — re-add when upstream fixes
   # custom_lint: ^0.7.0
   # riverpod_lint: ^2.6.0
