@@ -1,0 +1,41 @@
+name: remis_driver
+description: App del conductor de remís
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.5.0
+  flutter: ^3.27.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.6.0
+  riverpod_annotation: ^2.6.0
+  go_router: ^14.6.0
+  supabase_flutter: ^2.8.0
+  google_maps_flutter: ^2.10.0
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.9.0
+  device_info_plus: ^11.2.0
+  package_info_plus: ^8.1.0
+  permission_handler: ^11.3.1
+  remis_design_system:
+    path: ../../packages/design-system/flutter
+  remis_flutter_core:
+    path: ../../packages/flutter-core
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  build_runner: ^2.4.13
+  riverpod_generator: ^2.6.0
+  freezed: ^2.5.7
+  json_serializable: ^6.9.0
+  flutter_lints: ^5.0.0
+  # custom_lint + riverpod_lint: incompatible with Dart 3.10.x / analyzer 7.6 — re-add when upstream fixes
+  # custom_lint: ^0.7.0
+  # riverpod_lint: ^2.6.0
+
+flutter:
+  uses-material-design: true

@@ -1,0 +1,20 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  # plugins:
+  #   - custom_lint  # re-enable when compatible with Dart 3.10.x
+  errors:
+    invalid_annotation_target: ignore
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+
+linter:
+  rules:
+    prefer_single_quotes: true
+    avoid_print: true
+    unawaited_futures: true
+    always_use_package_imports: true
+    prefer_const_constructors: true
+    prefer_const_declarations: true
