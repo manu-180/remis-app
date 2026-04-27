@@ -2,16 +2,22 @@
 
 import { useEffect } from 'react';
 import { Command } from 'cmdk';
-import { Search, Plus, Users, List, BarChart2, Settings, LogOut } from 'lucide-react';
+import { Search, Plus, Users, List, BarChart2, Settings, LogOut, Lock, Monitor, Car, MapPin } from 'lucide-react';
 import { useUIStore } from '@/stores/ui-store';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import { useQueuedRides, useActiveRides } from '@/stores/rides-store';
+import { useOnlineDrivers } from '@/stores/drivers-store';
 
 export function CommandPalette() {
   const isOpen     = useUIStore((s) => s.isCommandPaletteOpen);
   const close      = useUIStore((s) => s.closeCommandPalette);
   const open       = useUIStore((s) => s.openCommandPalette);
   const setDensity = useUIStore((s) => s.setDensity);
+
+  const queuedRides   = useQueuedRides();
+  const activeRides   = useActiveRides();
+  const onlineDrivers = useOnlineDrivers();
 
   useHotkeys('mod+k', (e) => { e.preventDefault(); if (isOpen) { close(); } else { open(); } });
 
@@ -25,6 +31,14 @@ export function CommandPalette() {
     await getSupabaseBrowserClient().auth.signOut();
     window.location.href = '/login';
   };
+
+  const uniquePassengers = Array.from(
+    new Map(
+      queuedRides
+        .filter((r) => r.passenger?.phone)
+        .map((r) => [r.passenger!.phone, r.passenger!]),
+    ).values(),
+  ).slice(0, 5);
 
   if (!isOpen) return null;
 
@@ -63,13 +77,99 @@ export function CommandPalette() {
               heading="Acciones"
               className="text-[var(--text-xs)] text-[var(--neutral-500)] uppercase tracking-widest px-2 py-1"
             >
-              <CommandItem icon={Plus}   label="Nuevo pedido"    shortcut="Espacio" onSelect={() => { document.getElementById('field-phone')?.focus(); close(); }} />
-              <CommandItem icon={Users}  label="Asignar chofer"  shortcut="A"       onSelect={close} />
-              <CommandItem icon={List}   label="Buscar pasajero" shortcut="S"       onSelect={close} />
-              <CommandItem icon={Search} label="Buscar viaje #"  shortcut=""        onSelect={close} />
+              <CommandItem icon={Plus}    label="Nuevo pedido"      shortcut="Espacio" onSelect={() => { document.getElementById('field-phone')?.focus(); close(); }} />
+              <CommandItem icon={Users}   label="Asignar chofer"    shortcut="A"       onSelect={close} />
+              <CommandItem icon={List}    label="Buscar pasajero"   shortcut="S"       onSelect={close} />
+              <CommandItem icon={Search}  label="Buscar viaje #"    shortcut=""        onSelect={close} />
+              <CommandItem
+                icon={Monitor}
+                label="Abrir ventana mapa"
+                shortcut=""
+                onSelect={() => {
+                  window.open('/dispatch/map-fullscreen', 'dispatch-map', 'width=1920,height=1080');
+                  close();
+                }}
+              />
             </Command.Group>
 
             <Command.Separator className="h-px bg-[var(--neutral-200)] my-1" />
+
+            {uniquePassengers.length > 0 && (
+              <>
+                <Command.Group
+                  heading="Pasajeros"
+                  className="text-[var(--text-xs)] text-[var(--neutral-500)] uppercase tracking-widest px-2 py-1"
+                >
+                  {uniquePassengers.map((p) => (
+                    <Command.Item
+                      key={p.phone}
+                      value={`${p.name} ${p.phone}`}
+                      onSelect={() => {
+                        const el = document.getElementById('field-phone') as HTMLInputElement | null;
+                        if (el) { el.value = p.phone; el.focus(); el.dispatchEvent(new Event('input', { bubbles: true })); }
+                        close();
+                      }}
+                      className="flex items-center gap-3 px-3 py-2 rounded-[var(--radius-md)] text-[var(--text-sm)] text-[var(--neutral-700)] cursor-pointer data-[selected=true]:bg-[var(--neutral-200)]"
+                    >
+                      <Users size={16} className="text-[var(--neutral-500)]" aria-hidden />
+                      <span className="flex-1">{p.name}</span>
+                      <span className="text-[var(--text-xs)] text-[var(--neutral-400)] font-[var(--font-family-mono)]">{p.phone}</span>
+                    </Command.Item>
+                  ))}
+                </Command.Group>
+                <Command.Separator className="h-px bg-[var(--neutral-200)] my-1" />
+              </>
+            )}
+
+            {activeRides.length > 0 && (
+              <>
+                <Command.Group
+                  heading="Pedidos activos"
+                  className="text-[var(--text-xs)] text-[var(--neutral-500)] uppercase tracking-widest px-2 py-1"
+                >
+                  {activeRides.map((r) => (
+                    <Command.Item
+                      key={r.id}
+                      value={`${r.id.slice(-4).toUpperCase()} ${r.pickupAddress}`}
+                      onSelect={() => close()}
+                      className="flex items-center gap-3 px-3 py-2 rounded-[var(--radius-md)] text-[var(--text-sm)] text-[var(--neutral-700)] cursor-pointer data-[selected=true]:bg-[var(--neutral-200)]"
+                    >
+                      <MapPin size={16} className="text-[var(--neutral-500)]" aria-hidden />
+                      <span className="font-[var(--font-family-mono)] text-[var(--text-xs)] text-[var(--neutral-500)] shrink-0">
+                        #{r.id.slice(-4).toUpperCase()}
+                      </span>
+                      <span className="flex-1 truncate">{r.pickupAddress}</span>
+                    </Command.Item>
+                  ))}
+                </Command.Group>
+                <Command.Separator className="h-px bg-[var(--neutral-200)] my-1" />
+              </>
+            )}
+
+            {onlineDrivers.length > 0 && (
+              <>
+                <Command.Group
+                  heading="Choferes"
+                  className="text-[var(--text-xs)] text-[var(--neutral-500)] uppercase tracking-widest px-2 py-1"
+                >
+                  {onlineDrivers.map((d) => (
+                    <Command.Item
+                      key={d.id}
+                      value={`Móvil ${d.internalNumber} ${d.name} ${d.status}`}
+                      onSelect={() => close()}
+                      className="flex items-center gap-3 px-3 py-2 rounded-[var(--radius-md)] text-[var(--text-sm)] text-[var(--neutral-700)] cursor-pointer data-[selected=true]:bg-[var(--neutral-200)]"
+                    >
+                      <Car size={16} className="text-[var(--neutral-500)]" aria-hidden />
+                      <span className="flex-1">
+                        Móvil {d.internalNumber} · {d.name}
+                      </span>
+                      <span className="text-[var(--text-xs)] text-[var(--neutral-400)]">{d.status}</span>
+                    </Command.Item>
+                  ))}
+                </Command.Group>
+                <Command.Separator className="h-px bg-[var(--neutral-200)] my-1" />
+              </>
+            )}
 
             <Command.Group
               heading="Densidad"
@@ -94,8 +194,14 @@ export function CommandPalette() {
             <Command.Separator className="h-px bg-[var(--neutral-200)] my-1" />
 
             <Command.Group heading="Sesión">
-              <CommandItem icon={Settings} label="Configuración" shortcut="" onSelect={close} />
-              <CommandItem icon={LogOut}   label="Cerrar sesión" shortcut="" onSelect={handleSignOut} />
+              <CommandItem icon={Settings} label="Configuración"   shortcut=""  onSelect={close} />
+              <CommandItem
+                icon={Lock}
+                label="Bloquear pantalla"
+                shortcut="⌘L"
+                onSelect={() => { useUIStore.getState().lock(); close(); }}
+              />
+              <CommandItem icon={LogOut}   label="Cerrar sesión"   shortcut=""  onSelect={handleSignOut} />
             </Command.Group>
           </Command.List>
         </Command>
