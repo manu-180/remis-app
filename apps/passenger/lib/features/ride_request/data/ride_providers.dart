@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../../../core/mock_auth.dart';
 import 'models/driver_info_model.dart';
 import 'models/fare_estimate_model.dart';
 import 'models/ride_model.dart';
@@ -30,6 +31,27 @@ final activeRideFutureProvider = FutureProvider<RideModel?>((ref) {
 final frequentAddressesProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) {
   return ref.watch(rideRepositoryProvider).getFrequentAddresses();
+});
+
+/// Last 10 unique destinations from this passenger's ride history.
+final recentDestinationsProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) {
+  return ref.watch(rideRepositoryProvider).getRecentDestinations();
+});
+
+/// POIs for the local town. Query is defensive — returns [] if table missing.
+final placePoisProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final client = ref.watch(supabaseClientProvider);
+  try {
+    final result = await client
+        .from('place_pois')
+        .select('name, address_text, location')
+        .limit(20);
+    return (result as List).cast<Map<String, dynamic>>();
+  } catch (_) {
+    return [];
+  }
 });
 
 /// Fare estimate keyed by "pickupLat,pickupLng|destLat,destLng".

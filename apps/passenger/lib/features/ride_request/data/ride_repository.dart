@@ -175,6 +175,23 @@ class RideRepository {
     return (result as List).cast<Map<String, dynamic>>();
   }
 
+  Future<List<Map<String, dynamic>>> getRecentDestinations() async {
+    final result = await _client
+        .from('rides')
+        .select('dest_address, dest_location')
+        .eq('passenger_id', _userId)
+        .not('dest_address', 'is', null)
+        .order('created_at', ascending: false)
+        .limit(30);
+    // Deduplicate by dest_address, keep first 10 unique
+    final seen = <String>{};
+    return (result as List)
+        .cast<Map<String, dynamic>>()
+        .where((r) => seen.add(r['dest_address'] as String))
+        .take(10)
+        .toList();
+  }
+
   Future<void> incrementFrequentAddress({
     required String addressText,
     required LatLng location,
