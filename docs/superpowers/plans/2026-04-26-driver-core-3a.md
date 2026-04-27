@@ -282,8 +282,10 @@ git commit -m "chore(driver/ios): background modes, location usage descriptions"
 
 ```dart
 // apps/driver/lib/features/shift/data/location_service.dart
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_background_geolocation/flutter_background_geolocation.dart' as bg;
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:remis_flutter_core/remis_flutter_core.dart';
 
@@ -603,8 +605,29 @@ class ShiftController extends _$ShiftController {
       }
 
       final session = Supabase.instance.client.auth.currentSession!;
-      await LocationService.init(session: session, agencyId: '');
+      // Obtener agencyId del perfil del conductor
+      final driverRow = await Supabase.instance.client
+          .from('drivers')
+          .select('agency_id')
+          .eq('id', _uid)
+          .single();
+      final agencyId = (driverRow['agency_id'] as String?) ?? '';
+
+      await LocationService.init(session: session, agencyId: agencyId);
       await LocationService.start();
+      // Activar broadcast Realtime al mapa del dispatcher
+      LocationService.enableRealtimeBroadcast(
+        agencyId: agencyId,
+        realtime: Supabase.instance.client.realtime,
+        driverId: _uid,
+      );
+      // Activar heartbeat hacia Edge Function (detecta killing en OEMs chinos)
+      LocationService.enableHeartbeat(
+        driverId: _uid,
+        supabaseUrl: Env.supabaseUrl,
+        supabaseAnonKey: Env.supabaseAnonKey,
+        accessToken: session.accessToken,
+      );
       await _repo.startShift(_uid);
       state = const ShiftActive(DriverStatus.available);
     } catch (e) {
@@ -1100,11 +1123,10 @@ class _State extends State<StepOemSpecific> {
       primaryLabel: 'Listo',
       onPrimary: widget.onNext,
       secondaryLabel: _guide!.settingsIntent != null ? 'Abrir ajustes' : null,
+      // `intent:` URIs requieren android_intent_plus — no disponible en deps.
+      // Usamos openAppSettings() de permission_handler (ya instalado).
       onSecondary: _guide!.settingsIntent != null
-          ? () => launchUrl(
-                Uri.parse('intent:#Intent;action=${_guide!.settingsIntent};end'),
-                mode: LaunchMode.externalApplication,
-              )
+          ? () => openAppSettings()
           : null,
     );
   }
@@ -1317,7 +1339,7 @@ class _Reminder extends StatelessWidget {
 Crear como `apps/driver/lib/features/onboarding/presentation/widgets/onboarding_scaffold.dart` e importarlo en todos los steps. **No usar prefijo `_`** — Dart trata los identificadores con `_` como file-private, lo que impide importarlos desde otros archivos.
 
 ```dart
-// apps/driver/lib/features/onboarding/presentation/widgets/_onboarding_scaffold.dart
+// apps/driver/lib/features/onboarding/presentation/widgets/onboarding_scaffold.dart
 import 'package:flutter/material.dart';
 import 'package:remis_design_system/remis_design_system.dart';
 
@@ -1777,7 +1799,7 @@ class RideModel {
     );
   }
 
-  RideModel copyWith({RideStatus? status}) =>
+  RideModel copyWith({RideStatus? status, double? finalFareArs}) =>
       RideModel(
         id: id,
         passengerId: passengerId,
@@ -1788,13 +1810,14 @@ class RideModel {
         requestedAt: requestedAt,
         passengerName: passengerName,
         passengerAvatarUrl: passengerAvatarUrl,
+        passengerPhone: passengerPhone,
         distanceToPickupM: distanceToPickupM,
         etaToPickupMin: etaToPickupMin,
         destAddress: destAddress,
         distanceMeters: distanceMeters,
         etaTripMin: etaTripMin,
         estimatedFareArs: estimatedFareArs,
-        finalFareArs: finalFareArs,
+        finalFareArs: finalFareArs ?? this.finalFareArs,
         notes: notes,
         assignedAt: assignedAt,
         pickupArrivedAt: pickupArrivedAt,
@@ -2037,7 +2060,11 @@ class RideController extends _$RideController {
     // RPC 3D: suma tramos de driver_location_history para distancia real
     await _repo.recordRideDistance(rideId);
     final fareData = await _repo.computeFinalFare(rideId);
-    state = RideUiCompleted(ride.copyWith(status: RideStatus.completed), fareData);
+    final finalFare = (fareData?['final_fare_ars'] as num?)?.toDouble();
+    state = RideUiCompleted(
+      ride.copyWith(status: RideStatus.completed, finalFareArs: finalFare),
+      fareData,
+    );
   }
 
   Future<void> reportNoShow(String rideId) async {
@@ -3145,10 +3172,40 @@ Future<void> _handleSignOut(BuildContext context, WidgetRef ref) async {
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 2: Agregar widget test del logout guard**
+
+Crear `apps/driver/test/features/settings/logout_guard_test.dart`:
+
+```dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:remis_driver/features/shift/presentation/providers/shift_controller.dart';
+
+void main() {
+  group('ShiftState guard', () {
+    test('ShiftActive is detected correctly', () {
+      const state = ShiftActive(DriverStatus.available);
+      expect(state, isA<ShiftActive>());
+    });
+
+    test('ShiftIdle does not trigger guard', () {
+      const state = ShiftIdle();
+      expect(state is ShiftActive, isFalse);
+    });
+  });
+}
+```
+
+- [ ] **Step 3: Run test**
 
 ```bash
-git add apps/driver/lib/features/settings/
+cd apps/driver && flutter test test/features/settings/logout_guard_test.dart -v
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add apps/driver/lib/features/settings/ \
+        apps/driver/test/features/settings/
 git commit -m "feat(driver/settings): guardia de logout durante turno activo"
 ```
 
@@ -3196,7 +3253,9 @@ git commit -m "feat(driver): GPS background, ride lifecycle, onboarding — Tand
 | `GoogleService-Info.plist` | Cliente | Firebase → iOS → descargar → `ios/Runner/` |
 | Capabilities Xcode | Dev | Abrir Xcode → Runner → Signing & Capabilities → activar Background Modes |
 | RPCs en Supabase | Tanda 3D | `accept_ride`, `compute_final_fare`, `get_shift_summary`, `record_ride_distance` |
+| Edge Function `driver-heartbeat` | Tanda 3D | Recibe POST del heartbeat y persiste en `driver_heartbeats`; sin ella la app sigue funcionando pero los OEMs no se detectan |
 | `onboarding_completed_at` en tabla drivers | Tanda 3D | Columna para sync cross-device (mientras tanto: SharedPreferences local) |
+| `agency_id` en tabla `drivers` | Tanda 3D o pre-existente | ShiftController la lee para el canal Realtime; si no existe, el broadcast queda sin agencyId |
 
 ---
 

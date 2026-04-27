@@ -68,7 +68,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.waiting,
         builder: (context, state) {
-          final rideId = state.extra as String;
+          final rideId = state.extra as String?;
+          if (rideId == null) return const _RouteErrorScreen(message: 'Ride ID no encontrado');
           return WaitingScreen(rideId: rideId);
         },
       ),
@@ -94,8 +95,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.tripComplete,
         builder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>;
-          final ride = extra['ride'] as RideModel;
+          final extra = state.extra as Map<String, dynamic>?;
+          if (extra == null) return const _RouteErrorScreen(message: 'Datos del viaje no disponibles');
+          final ride = extra['ride'] as RideModel?;
+          if (ride == null) return const _RouteErrorScreen(message: 'Datos del viaje no disponibles');
           final driver = extra['driver'] as DriverInfoModel?;
           return TripCompleteScreen(ride: ride, driver: driver);
         },
