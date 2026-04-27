@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+:root {
+  --brand-primary: #1B2A4E;
+  --brand-primary-hover: #243762;
+  --brand-accent: #D97706;
+  --brand-accent-hover: #B45309;
+  --neutral-0: #FFFFFF;
+  --neutral-50: #FAFAFA;
+  --neutral-100: #F4F4F5;
+  --neutral-200: #E4E4E7;
+  --neutral-300: #D4D4D8;
+  --neutral-400: #A1A1AA;
+  --neutral-500: #71717A;
+  --neutral-600: #52525B;
+  --neutral-700: #3F3F46;
+  --neutral-800: #27272A;
+  --neutral-900: #18181B;
+  --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px; --radius-2xl: 24px;
+
+  --success: #16A34A; --success-bg: #F0FDF4;
+  --warning: #CA8A04; --warning-bg: #FEFCE8;
+  --danger: #DC2626; --danger-bg: #FEF2F2;
+  --info: #2563EB; --info-bg: #EFF6FF;
+
+  --ease-out: cubic-bezier(0.16,1,0.3,1);
+  --dur-fast: 150ms;
+  --dur-normal: 240ms;
+}
+
+.dark {
+  --brand-primary: #7CA0FF;
+  --brand-accent: #F59E0B;
+  --neutral-0: #0A0B0F;
+  --neutral-100: #181B23;
+  --neutral-200: #23262F;
+  --neutral-900: #F4F5F9;
+}
+
+body {
+  background: var(--neutral-0);
+  color: var(--neutral-900);
+}
