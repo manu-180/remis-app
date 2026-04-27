@@ -1,6 +1,8 @@
 // apps/dispatcher/src/app/layout.tsx
 import type { Metadata } from 'next';
 import { Inter, Inter_Tight, Geist_Mono } from 'next/font/google';
+import { PHProvider } from '@/components/providers/posthog-provider';
+import { PostHogPageView } from '@/components/posthog-page-view';
 import './globals.css';
 
 const inter = Inter({
@@ -39,7 +41,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#main-content" className="skip-link">
           Saltar al contenido principal
         </a>
-        {children}
+        <PHProvider>
+          <PostHogPageView />
+          {children}
+        </PHProvider>
       </body>
     </html>
   );

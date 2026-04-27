@@ -1,5 +1,7 @@
 import 'dart:developer' as dev;
 
+import 'package:sentry_flutter/sentry_flutter.dart';
+
 enum LogLevel { debug, info, warning, error }
 
 class AppLogger {
@@ -15,8 +17,16 @@ class AppLogger {
   void warning(String message, {Object? error}) =>
       _log(LogLevel.warning, message, error: error);
 
-  void error(String message, {Object? error, StackTrace? stackTrace}) =>
-      _log(LogLevel.error, message, error: error, stackTrace: stackTrace);
+  void error(String message, {Object? error, StackTrace? stackTrace}) {
+    _log(LogLevel.error, message, error: error, stackTrace: stackTrace);
+    if (error != null) {
+      Sentry.captureException(
+        error,
+        stackTrace: stackTrace,
+        withScope: (scope) => scope.setTag('logger_tag', _tag),
+      );
+    }
+  }
 
   void _log(
     LogLevel level,
@@ -39,5 +49,4 @@ class AppLogger {
   }
 }
 
-// Tanda 5A will connect this to Sentry
 AppLogger logger(String tag) => AppLogger(tag);

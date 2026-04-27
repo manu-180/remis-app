@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
@@ -8,7 +10,7 @@ import 'core/notifications/fcm_service.dart';
 import 'core/notifications/notification_router.dart';
 import 'core/routing/app_router.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
@@ -16,24 +18,44 @@ void main() async {
     anonKey: Env.supabaseAnonKey,
   );
 
-  // FCM is wired up via a ProviderScope override so the service can read
-  // the GoRouter instance without a circular dependency. The actual
-  // initialize() call is deferred to after the user authenticates — the
-  // stub implementation is a no-op when called unauthenticated, so calling
-  // it here is safe for future readiness.
-  runApp(
-    ProviderScope(
-      observers: [_FcmInitObserver()],
-      child: const PassengerApp(),
+  if (Env.posthogKey.isNotEmpty) {
+    final config = PostHogConfig(Env.posthogKey)
+      ..host = 'https://us.i.posthog.com'
+      ..captureApplicationLifecycleEvents = true
+      ..sessionReplay = true
+      ..sessionReplayConfig = (PostHogSessionReplayConfig()
+        ..maskAllTextInputs = true
+        ..maskAllImages = false)
+      ..debug = !Env.isProd;
+    await Posthog().setup(config);
+  }
+
+  await SentryFlutter.init(
+    (options) {
+      options.dsn = Env.sentryDsn;
+      options.tracesSampleRate = Env.isProd ? 0.1 : 1.0;
+      options.profilesSampleRate = 0.1;
+      options.environment = Env.environment;
+      options.release = 'remis-passenger@1.0.0+1';
+      options.enableAutoSessionTracking = true;
+      options.beforeSend = (event, hint) {
+        if (event.user != null) {
+          return event.copyWith(
+            user: event.user!.copyWith(email: null, ipAddress: null),
+          );
+        }
+        return event;
+      };
+    },
+    appRunner: () => runApp(
+      ProviderScope(
+        observers: [_FcmInitObserver()],
+        child: const PassengerApp(),
+      ),
     ),
   );
 }
 
-/// Riverpod observer that initialises [FcmService] once the container is
-/// ready and wires up the notification-tap → GoRouter deep-link handler.
-///
-/// Using an observer avoids the need to look up providers in [main] before
-/// [ProviderScope] is mounted, and keeps [main] minimal.
 class _FcmInitObserver extends ProviderObserver {
   @override
   void didAddProvider(
@@ -41,7 +63,6 @@ class _FcmInitObserver extends ProviderObserver {
     Object? value,
     ProviderContainer container,
   ) {
-    // Initialise FCM exactly once, when the fcmServiceProvider is first read.
     if (provider == fcmServiceProvider) {
       try {
         final fcmService = container.read(fcmServiceProvider);
@@ -51,8 +72,6 @@ class _FcmInitObserver extends ProviderObserver {
           handleNotificationTap(type: type, rideId: rideId, router: router);
         });
 
-        // Deferred: initialize() is a stub now; becomes real in tanda-4.
-        // It guards internally against unauthenticated state.
         fcmService.initialize();
       } catch (e) {
         debugPrint('[FcmService] FCM init failed: $e');

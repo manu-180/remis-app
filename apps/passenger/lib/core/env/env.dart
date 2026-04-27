@@ -15,4 +15,10 @@ abstract final class Env {
     'GOOGLE_MAPS_API_KEY',
     defaultValue: '',
   );
+
+  static const sentryDsn = String.fromEnvironment('SENTRY_DSN', defaultValue: '');
+  static const posthogKey = String.fromEnvironment('POSTHOG_KEY', defaultValue: '');
+  static const environment = String.fromEnvironment('ENVIRONMENT', defaultValue: 'dev');
+
+  static bool get isProd => environment == 'prd';
 }

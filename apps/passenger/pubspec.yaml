@@ -14,6 +14,10 @@ dependencies:
   remis_flutter_core:
     path: ../../packages/flutter-core
 
+  # Observability
+  sentry_flutter: ^8.13.0
+  posthog_flutter: ^4.7.0
+
   # State management
   flutter_riverpod: ^2.6.1
   riverpod_annotation: ^2.6.1
