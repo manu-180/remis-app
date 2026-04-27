@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:remis_driver/features/auth/presentation/screens/splash_screen.dart';
 import 'package:remis_driver/features/auth/presentation/screens/phone_login_screen.dart';
 import 'package:remis_driver/features/auth/presentation/screens/otp_verify_screen.dart';
+import 'package:remis_driver/features/chat/presentation/screens/chat_screen.dart';
 import 'package:remis_driver/features/home/presentation/screens/home_screen.dart';
 import 'package:remis_driver/features/settings/presentation/screens/settings_screen.dart';
 
@@ -41,6 +42,13 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/settings',
       builder: (_, __) => const SettingsScreen(),
+    ),
+    GoRoute(
+      path: '/chat/:rideId/:passengerId',
+      builder: (_, state) => ChatScreen(
+        rideId: state.pathParameters['rideId']!,
+        passengerId: state.pathParameters['passengerId']!,
+      ),
     ),
   ],
 );
