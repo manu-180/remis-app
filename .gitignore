@@ -10,9 +10,11 @@ next-env.d.ts
 
 # ───────── Build outputs ─────────
 dist/
-build/
+/build/
 .turbo/
 coverage/
+# Allow packages/design-system/build/ (source scripts, not outputs)
+!packages/design-system/build/
 
 # ───────── Flutter / Dart ─────────
 .dart_tool/
