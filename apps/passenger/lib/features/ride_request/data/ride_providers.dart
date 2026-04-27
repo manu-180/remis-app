@@ -36,8 +36,10 @@ final frequentAddressesProvider =
 final fareEstimateProvider =
     FutureProvider.family<FareEstimateModel, String>((ref, key) {
   final halves = key.split('|');
+  if (halves.length != 2) throw ArgumentError('Invalid fare key: $key');
   final pickup = halves[0].split(',');
   final dest = halves[1].split(',');
+  if (pickup.length != 2 || dest.length != 2) throw ArgumentError('Invalid lat,lng in fare key: $key');
   return ref.watch(rideRepositoryProvider).estimateFare(
         pickup: _parseLatLng(pickup),
         dest: _parseLatLng(dest),

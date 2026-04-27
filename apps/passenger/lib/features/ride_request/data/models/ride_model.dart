@@ -43,7 +43,7 @@ class RideModel {
   const RideModel({
     required this.id,
     required this.status,
-    required this.pickupAddress,
+    this.pickupAddress,
     required this.pickupLocation,
     this.destAddress,
     this.destLocation,
@@ -81,10 +81,10 @@ class RideModel {
   factory RideModel.fromMap(Map<String, dynamic> map) {
     // Parse geography point: Supabase returns "SRID=4326;POINT(lng lat)"
     LatLng parseGeo(dynamic val) {
-      if (val == null) return const LatLng(0, 0);
+      if (val == null) throw FormatException('Missing required location field');
       final s = val.toString();
       final match = RegExp(r'POINT\(([^ ]+) ([^)]+)\)').firstMatch(s);
-      if (match == null) return const LatLng(0, 0);
+      if (match == null) throw FormatException('Cannot parse WKT location: $s');
       // PostGIS POINT stores (longitude latitude), so group(1)=lng, group(2)=lat
       return LatLng(double.parse(match.group(2)!), double.parse(match.group(1)!));
     }

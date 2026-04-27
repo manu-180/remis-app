@@ -23,7 +23,10 @@ class RideRepository {
       'dest_lat': dest.latitude,
       'dest_lng': dest.longitude,
     });
-    final row = (result as List).first as Map<String, dynamic>;
+    if (result == null) throw Exception('estimate_fare returned null');
+    final list = result as List;
+    if (list.isEmpty) throw Exception('No fare estimate for this route');
+    final row = list.first as Map<String, dynamic>;
     return FareEstimateModel.fromMap(row);
   }
 
@@ -79,6 +82,7 @@ class RideRepository {
       'p_actor_id': _userId,
       'p_reason': reason,
     });
+    if (result == null) throw Exception('cancel_ride returned null');
     return RideModel.fromMap(result as Map<String, dynamic>);
   }
 
@@ -137,11 +141,13 @@ class RideRepository {
   }
 
   Future<String> createSharedTrip(String rideId) async {
-    final token = await _client.rpc('create_shared_trip', params: {
+    final result = await _client.rpc('create_shared_trip', params: {
       'p_ride_id': rideId,
       'p_user_id': _userId,
     });
-    return token as String;
+    final token = result?.toString();
+    if (token == null || token.isEmpty) throw Exception('create_shared_trip returned no token');
+    return token;
   }
 
   Future<void> submitRating({

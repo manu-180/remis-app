@@ -11,8 +11,8 @@ class FareEstimateModel {
 
   factory FareEstimateModel.fromMap(Map<String, dynamic> map) {
     return FareEstimateModel(
-      estimatedAmountArs: (map['estimated_amount_ars'] as num).toDouble(),
-      estimatedDistanceM: (map['estimated_distance_m'] as num).toDouble(),
+      estimatedAmountArs: (map['estimated_amount_ars'] as num?)?.toDouble() ?? 0.0,
+      estimatedDistanceM: (map['estimated_distance_m'] as num?)?.toDouble() ?? 0.0,
       breakdown: map['breakdown'] as Map<String, dynamic>?,
     );
   }

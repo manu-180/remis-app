@@ -46,7 +46,7 @@ class DriverInfoModel {
     final locMap = map['driver_current_location'] as Map<String, dynamic>?;
 
     // Resolve driver id — flat stream uses 'driver_id', join uses 'id'
-    final id = map['driver_id'] as String? ?? map['id'] as String;
+    final id = (map['driver_id'] ?? map['id']) as String;
 
     // Resolve location — may come from nested locMap or flat 'location' field
     final rawLocation = locMap != null ? locMap['location'] : map['location'];
