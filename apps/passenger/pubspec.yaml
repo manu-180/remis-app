@@ -1,0 +1,54 @@
+name: passenger
+description: Passenger app for Remis — request rides, track driver, manage trips.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Local packages
+  remis_flutter_core:
+    path: ../../packages/flutter-core
+
+  # State management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # Navigation
+  go_router: ^14.6.2
+
+  # Maps
+  google_maps_flutter: ^2.9.0
+
+  # Location (foreground only — passenger does NOT need background)
+  geolocator: ^13.0.2
+
+  # Auth & backend
+  supabase_flutter: ^2.8.4
+
+  # Address autocomplete
+  flutter_typeahead: ^5.2.0
+
+  # MercadoPago checkout (Tanda 4D)
+  flutter_custom_tabs: ^2.4.0
+
+  # Fonts
+  google_fonts: ^6.2.1
+
+  # Utilities
+  intl: ^0.20.1
+  url_launcher: ^6.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  build_runner: ^2.4.13
+  riverpod_generator: ^2.6.5
+
+flutter:
+  uses-material-design: true

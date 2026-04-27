@@ -1,0 +1,8 @@
+{
+  "SUPABASE_URL": "http://localhost:54321",
+  "SUPABASE_ANON_KEY": "your-anon-key-here",
+  "GOOGLE_MAPS_API_KEY": "",
+  "MP_PUBLIC_KEY": "",
+  "SENTRY_DSN": "",
+  "ENVIRONMENT": "prd"
+}
