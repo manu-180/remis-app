@@ -8,6 +8,9 @@ import {
   Users,
   DollarSign,
   BarChart2,
+  Activity,
+  ShieldCheck,
+  ClipboardList,
   Settings,
   LogOut,
 } from 'lucide-react';
@@ -19,6 +22,9 @@ const NAV_ITEMS = [
   { href: '/admin/conductores', label: 'Conductores', icon: Users },
   { href: '/admin/tarifas', label: 'Tarifas', icon: DollarSign },
   { href: '/admin/reportes', label: 'Reportes', icon: BarChart2 },
+  { href: '/admin/heartbeat-monitor', label: 'Heartbeat', icon: Activity },
+  { href: '/admin/slo', label: 'SLOs', icon: ShieldCheck },
+  { href: '/admin/audit', label: 'Auditoría', icon: ClipboardList },
 ];
 
 export function AdminSidebar() {
