@@ -12,11 +12,14 @@ import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../ride_request/data/models/destination_result.dart';
 import '../../../ride_request/data/models/ride_model.dart';
+import '../../../ride_request/data/models/route_result.dart';
 import '../../../ride_request/data/ride_providers.dart';
+import '../../../ride_request/data/ride_repository.dart';
 import '../../../ride_request/presentation/screens/destination_search_screen.dart';
 import '../../../ride_request/presentation/widgets/ride_confirmation_sheet.dart';
-import '../widgets/home_bottom_sheet.dart';
 import '../widgets/map_style.dart';
+import '../widgets/route_info_chip.dart';
+import '../widgets/route_panel.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -32,6 +35,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _showDisclosure = true;
   bool _loadingLocation = false;
   bool _mapReady = false;
+
+  DestinationResult? _destination;
+  RouteResult? _route;
+  double? _fareArs;
 
   static const _defaultCenter = LatLng(-36.6167, -64.2833); // Santa Rosa, La Pampa
 
@@ -110,8 +117,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => DestinationSearchScreen(
+          currentLocation: _pickupLocation,
           onDestinationSelected: (result) {
-            Navigator.pop(context); // close destination search
+            Navigator.pop(context);
             _onDestinationSelected(result);
           },
         ),
@@ -119,9 +127,76 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  void _onDestinationSelected(DestinationResult dest) {
+  Future<void> _onDestinationSelected(DestinationResult dest) async {
     final pickup = _pickupLocation;
     if (pickup == null) return;
+
+    setState(() {
+      _destination = dest;
+      _route = null;
+      _fareArs = null;
+    });
+
+    // Fetch route and fare in parallel.
+    final routeFuture =
+        ref.read(directionsServiceProvider).route(pickup, dest.location);
+    final fareFuture = ref
+        .read(rideRepositoryProvider)
+        .estimateFare(pickup: pickup, dest: dest.location)
+        .then<double?>((f) => f.estimatedAmountArs)
+        .catchError((_) => null);
+
+    try {
+      final route = await routeFuture;
+      if (!mounted) return;
+      setState(() => _route = route);
+      _fitCameraToRoute(pickup, dest.location);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo calcular la ruta')),
+      );
+    }
+
+    final fare = await fareFuture;
+    if (!mounted) return;
+    setState(() => _fareArs = fare);
+  }
+
+  void _fitCameraToRoute(LatLng a, LatLng b) {
+    final ctrl = _mapController;
+    if (ctrl == null) return;
+    final bounds = LatLngBounds(
+      southwest: LatLng(
+        a.latitude < b.latitude ? a.latitude : b.latitude,
+        a.longitude < b.longitude ? a.longitude : b.longitude,
+      ),
+      northeast: LatLng(
+        a.latitude > b.latitude ? a.latitude : b.latitude,
+        a.longitude > b.longitude ? a.longitude : b.longitude,
+      ),
+    );
+    // 80px padding so chip + panel don't overlap markers.
+    ctrl.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+  }
+
+  void _clearDestination() {
+    setState(() {
+      _destination = null;
+      _route = null;
+      _fareArs = null;
+    });
+    if (_pickupLocation != null) {
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLngZoom(_pickupLocation!, 15.5),
+      );
+    }
+  }
+
+  void _confirmDestination() {
+    final pickup = _pickupLocation;
+    final dest = _destination;
+    if (pickup == null || dest == null) return;
 
     showModalBottomSheet<void>(
       context: context,
@@ -180,11 +255,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   markerId: const MarkerId('pickup'),
                   position: _pickupLocation!,
                   icon: BitmapDescriptor.defaultMarkerWithHue(
-                    BitmapDescriptor.hueOrange,
+                    BitmapDescriptor.hueGreen,
                   ),
-                  draggable: true,
-                  onDragEnd: (pos) =>
-                      setState(() => _pickupLocation = pos),
+                  draggable: _destination == null,
+                  onDragEnd: (pos) => setState(() => _pickupLocation = pos),
+                ),
+              if (_destination != null)
+                Marker(
+                  markerId: const MarkerId('destination'),
+                  position: _destination!.location,
+                  icon: BitmapDescriptor.defaultMarkerWithHue(
+                    BitmapDescriptor.hueRed,
+                  ),
+                  infoWindow: InfoWindow(title: _destination!.label),
+                ),
+            },
+            polylines: {
+              if (_route != null)
+                Polyline(
+                  polylineId: const PolylineId('route'),
+                  points: _route!.polyline,
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 5,
+                  startCap: Cap.roundCap,
+                  endCap: Cap.roundCap,
                 ),
             },
             onMapCreated: (ctrl) {
@@ -210,6 +304,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
           ),
+
+          // ── Route info chip (fare · ETA · distance) ──
+          if (_route != null)
+            Positioned(
+              top: 90,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                child: Center(
+                  child: RouteInfoChip(
+                    fareArs: _fareArs,
+                    durationMinutes: _route!.durationMinutes,
+                    distanceKm: _route!.distanceKm,
+                  ),
+                ),
+              ),
+            ),
 
           // ── Location CTA when permission denied ──
           if (!_locationPermissionGranted)
@@ -244,11 +355,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
 
-          // ── Bottom sheet (3 stops) ──
-          HomeBottomSheet(
-            pickupLocation: _pickupLocation,
-            onSearchTap: _pickupLocation != null ? _openDestinationSearch : null,
-            onDestinationSelected: (_) {}, // Legacy callback — unused now
+          // ── Bottom panel (collapsed / route-ready) ──
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: RoutePanel(
+              pickupAddress: 'Mi ubicación',
+              destinationLabel: _destination?.label,
+              destinationAddress: _destination?.address,
+              onSearchTap:
+                  _pickupLocation != null ? _openDestinationSearch : () {},
+              onClearDestination: _clearDestination,
+              onConfirm: _confirmDestination,
+            ),
           ),
         ],
       ),
