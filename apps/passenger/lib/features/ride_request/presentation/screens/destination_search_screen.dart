@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../data/models/destination_result.dart';
+import '../../data/models/place_prediction.dart';
 import '../../data/ride_providers.dart';
+import '../../data/services/places_service.dart';
 
 // ---------------------------------------------------------------------------
 // PostGIS WKT parse helper
@@ -30,21 +34,18 @@ LatLng? _parseGeoPoint(dynamic val) {
 /// Calls [onDestinationSelected] with the chosen [DestinationResult] and pops.
 /// Closing without a selection pops without invoking the callback.
 ///
-/// Note: Google Places live autocomplete is intentionally omitted. The search
-/// field filters the three static sections (Frecuentes, Recientes, Sugerencias)
-/// client-side. When the Places API key is available, replace the
-/// [_filterSections] approach inside [_onQueryChanged] with a Places SDK call
-/// via a SuggestionsCallback passed to flutter_typeahead.
-/// TODO(places-api): Wire up Google Places Autocomplete restricted to
-///   ~30 km radius around Santa Rosa, La Pampa (-36.6167, -64.2833) once the
-///   API key is provisioned in Supabase secrets and exposed via an Edge Function.
+/// Live results come from Google Places Autocomplete (Argentina-biased).
+/// Frecuentes/Recientes/Sugerencias-locales remain as fallbacks for an
+/// empty query and as quick-pick rows.
 class DestinationSearchScreen extends ConsumerStatefulWidget {
   const DestinationSearchScreen({
     super.key,
     required this.onDestinationSelected,
+    this.currentLocation,
   });
 
   final void Function(DestinationResult result) onDestinationSelected;
+  final LatLng? currentLocation;
 
   @override
   ConsumerState<DestinationSearchScreen> createState() =>
@@ -55,10 +56,13 @@ class _DestinationSearchScreenState
     extends ConsumerState<DestinationSearchScreen> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
-  String _query = '';
+  String _query = '';            // raw, used for client-side filter
+  String _debouncedQuery = '';   // debounced, used for Places API
+  Timer? _debounce;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -66,6 +70,11 @@ class _DestinationSearchScreenState
 
   void _onQueryChanged(String value) {
     setState(() => _query = value.trim().toLowerCase());
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      setState(() => _debouncedQuery = value.trim());
+    });
   }
 
   bool _matches(String text) =>
@@ -153,6 +162,11 @@ class _DestinationSearchScreenState
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.only(bottom: 24),
                 children: [
+                  _PlacesSection(
+                    query: _debouncedQuery,
+                    bias: widget.currentLocation,
+                    onSelect: _select,
+                  ),
                   _FrequentesSection(
                     asyncValue: frequentAsync,
                     query: _query,
@@ -426,6 +440,122 @@ class _SectionLoading extends StatelessWidget {
           height: 20,
           child: CircularProgressIndicator(strokeWidth: 2),
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Google Places suggestions (live)
+// ---------------------------------------------------------------------------
+
+class _PlacesSection extends ConsumerWidget {
+  const _PlacesSection({
+    required this.query,
+    required this.bias,
+    required this.onSelect,
+  });
+
+  final String query;
+  final LatLng? bias;
+  final void Function(DestinationResult) onSelect;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (query.trim().length < 2) return const SizedBox.shrink();
+    final async = ref.watch(
+      placePredictionsProvider((query: query, bias: bias)),
+    );
+    return async.when(
+      loading: () => const _SectionLoading(),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Text(
+          e is PlacesException && e.status == 'HTTP_403'
+              ? 'No se pudieron cargar sugerencias.'
+              : 'Sin conexión.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ),
+      data: (predictions) {
+        if (predictions.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionHeader('Sugerencias'),
+            ...predictions.map((p) => _PredictionTile(
+                  prediction: p,
+                  query: query,
+                  onTap: () => _resolveAndSelect(ref, p),
+                )),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _resolveAndSelect(WidgetRef ref, PlacePrediction p) async {
+    try {
+      final loc = await ref.read(placesServiceProvider).details(p.placeId);
+      onSelect(DestinationResult(
+        label: p.mainText,
+        address: p.description.isNotEmpty ? p.description : p.mainText,
+        location: loc,
+      ));
+    } catch (_) {
+      // Swallow — surface a snackbar in caller if desired.
+    }
+  }
+}
+
+class _PredictionTile extends StatelessWidget {
+  const _PredictionTile({
+    required this.prediction,
+    required this.query,
+    required this.onTap,
+  });
+
+  final PlacePrediction prediction;
+  final String query;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListTile(
+      leading: Icon(Icons.place_outlined, color: theme.colorScheme.primary),
+      title: _highlight(prediction.mainText, query, theme),
+      subtitle: Text(
+        prediction.secondaryText,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      onTap: onTap,
+    );
+  }
+
+  Widget _highlight(String text, String q, ThemeData theme) {
+    if (q.isEmpty) return Text(text, style: theme.textTheme.bodyLarge);
+    final lower = text.toLowerCase();
+    final i = lower.indexOf(q.toLowerCase());
+    if (i < 0) return Text(text, style: theme.textTheme.bodyLarge);
+    return RichText(
+      text: TextSpan(
+        style: theme.textTheme.bodyLarge,
+        children: [
+          TextSpan(text: text.substring(0, i)),
+          TextSpan(
+            text: text.substring(i, i + q.length),
+            style: TextStyle(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          TextSpan(text: text.substring(i + q.length)),
+        ],
       ),
     );
   }
