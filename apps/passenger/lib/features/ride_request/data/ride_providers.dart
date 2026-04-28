@@ -1,11 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http/http.dart' as http;
 
+import '../../../core/env/env.dart';
 import '../../../core/mock_auth.dart';
 import 'models/driver_info_model.dart';
 import 'models/fare_estimate_model.dart';
+import 'models/place_prediction.dart';
 import 'models/ride_model.dart';
+import 'models/route_result.dart';
 import 'ride_repository.dart';
+import 'services/directions_service.dart';
+import 'services/places_service.dart';
 
 LatLng _parseLatLng(List<String> parts) =>
     LatLng(double.parse(parts[0]), double.parse(parts[1]));
@@ -66,4 +72,51 @@ final fareEstimateProvider =
         pickup: _parseLatLng(pickup),
         dest: _parseLatLng(dest),
       );
+});
+
+// ---------------------------------------------------------------------------
+// Google Places + Directions
+// ---------------------------------------------------------------------------
+
+final _googleHttpClientProvider = Provider<http.Client>((ref) {
+  final c = http.Client();
+  ref.onDispose(c.close);
+  return c;
+});
+
+final placesServiceProvider = Provider<PlacesService>((ref) {
+  return PlacesService(
+    httpClient: ref.watch(_googleHttpClientProvider),
+    apiKey: Env.googleMapsApiKey,
+  );
+});
+
+final directionsServiceProvider = Provider<DirectionsService>((ref) {
+  return DirectionsService(
+    httpClient: ref.watch(_googleHttpClientProvider),
+    apiKey: Env.googleMapsApiKey,
+  );
+});
+
+/// Key for Places autocomplete: query + optional location bias.
+typedef AutocompleteKey = ({String query, LatLng? bias});
+
+/// Live autocomplete results. Returns [] for queries shorter than 2 chars.
+final placePredictionsProvider =
+    FutureProvider.family<List<PlacePrediction>, AutocompleteKey>(
+        (ref, key) async {
+  if (key.query.trim().length < 2) return const [];
+  return ref.watch(placesServiceProvider).autocomplete(
+        key.query.trim(),
+        locationBias: key.bias,
+      );
+});
+
+/// Key for Directions: origin + destination snapshot.
+typedef RouteKey = ({LatLng origin, LatLng destination});
+
+/// Driving route between origin and destination.
+final routeProvider =
+    FutureProvider.family<RouteResult, RouteKey>((ref, key) async {
+  return ref.watch(directionsServiceProvider).route(key.origin, key.destination);
 });
