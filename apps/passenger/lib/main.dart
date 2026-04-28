@@ -24,7 +24,7 @@ Future<void> main() async {
       ..captureApplicationLifecycleEvents = true
       ..sessionReplay = true
       ..sessionReplayConfig = (PostHogSessionReplayConfig()
-        ..maskAllTextInputs = true
+        ..maskAllTexts = true
         ..maskAllImages = false)
       ..debug = !Env.isProd;
     await Posthog().setup(config);

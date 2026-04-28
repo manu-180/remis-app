@@ -31,6 +31,7 @@ dependencies:
   audioplayers: ^6.1.0
   battery_plus: ^6.0.3
   sentry_flutter: ^8.13.0
+  http: ^1.2.2
   remis_design_system:
     path: ../../packages/design-system/flutter
   remis_flutter_core:
@@ -54,3 +55,9 @@ flutter:
 
   assets:
     - assets/sounds/
+
+# Fix: analyzer_plugin 0.12.0 (transitivo via riverpod_generator) usa publiclyExporting2,
+# que fue eliminado en analyzer 7.6. Pinear analyzer en 7.4.x mantiene la API y
+# es compatible con freezed 2.5 + riverpod_generator.
+dependency_overrides:
+  analyzer_plugin: ^0.13.0

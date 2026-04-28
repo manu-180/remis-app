@@ -1,15 +1,12 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
-
 part of 'theme_controller.dart';
 
 // **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 
-String _$themeControllerHash() => r'theme_controller_keepalive';
+String _$themeControllerHash() => r'aae6e2f6bc275f82bb289f142fe2dc23f651a79d';
 
 /// See also [ThemeController].
 @ProviderFor(ThemeController)
@@ -25,3 +22,5 @@ final themeControllerProvider =
 );
 
 typedef _$ThemeController = Notifier<ThemeMode>;
+// ignore_for_file: type=lint
+// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
