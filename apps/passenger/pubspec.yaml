@@ -37,6 +37,12 @@ dependencies:
   # Address autocomplete
   flutter_typeahead: ^5.2.0
 
+  # HTTP (Google APIs)
+  http: ^1.2.2
+
+  # Polyline decoding for Directions API
+  google_polyline_algorithm: ^3.1.0
+
   # MercadoPago checkout (Tanda 4D)
   flutter_custom_tabs: ^2.4.0
 
