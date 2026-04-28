@@ -5,6 +5,8 @@ import 'package:remis_driver/features/auth/presentation/screens/phone_login_scre
 import 'package:remis_driver/features/auth/presentation/screens/otp_verify_screen.dart';
 import 'package:remis_driver/features/chat/presentation/screens/chat_screen.dart';
 import 'package:remis_driver/features/home/presentation/screens/home_screen.dart';
+import 'package:remis_driver/features/kyc/presentation/screens/kyc_onboarding_screen.dart';
+import 'package:remis_driver/features/kyc/presentation/screens/intra_shift_verification_screen.dart';
 import 'package:remis_driver/features/settings/presentation/screens/settings_screen.dart';
 
 final appRouter = GoRouter(
@@ -48,6 +50,16 @@ final appRouter = GoRouter(
       builder: (_, state) => ChatScreen(
         rideId: state.pathParameters['rideId']!,
         passengerId: state.pathParameters['passengerId']!,
+      ),
+    ),
+    GoRoute(
+      path: '/kyc/onboarding',
+      builder: (_, __) => const KycOnboardingScreen(),
+    ),
+    GoRoute(
+      path: '/kyc/intra-shift',
+      builder: (_, state) => IntraShiftVerificationScreen(
+        isPreShift: state.extra as bool? ?? true,
       ),
     ),
   ],
