@@ -1,0 +1,40 @@
+name: Deploy Supabase
+
+on:
+  push:
+    branches: [main, staging]
+    paths:
+      - 'supabase/**'
+
+jobs:
+  deploy:
+    name: Deploy to ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+
+      - name: Link project
+        run: supabase link --project-ref ${{ vars.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Push migrations
+        run: supabase db push --linked
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy edge functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          for fn in supabase/functions/*/; do
+            name=$(basename "$fn")
+            [ "$name" = "_shared" ] && continue
+            no_jwt_flag=""
+            [ "$name" = "mp-webhook" ] && no_jwt_flag="--no-verify-jwt"
+            [ "$name" = "health" ] && no_jwt_flag="--no-verify-jwt"
+            supabase functions deploy "$name" $no_jwt_flag
+          done

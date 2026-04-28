@@ -1,0 +1,64 @@
+default_platform(:android)
+
+platform :android do
+  desc "Build and upload to Play Store internal track"
+  lane :internal do
+    gradle(task: "clean")
+    gradle(
+      task: "bundleRelease",
+      project_dir: "../",
+      properties: {
+        "android.injected.signing.store.file" => ENV["ANDROID_KEYSTORE_PATH"],
+        "android.injected.signing.store.password" => ENV["ANDROID_KEYSTORE_PASSWORD"],
+        "android.injected.signing.key.alias" => ENV["ANDROID_KEY_ALIAS"],
+        "android.injected.signing.key.password" => ENV["ANDROID_KEY_PASSWORD"],
+      }
+    )
+    upload_to_play_store(
+      track: "internal",
+      skip_upload_apk: true,
+      json_key_data: ENV["PLAY_STORE_CONFIG_JSON"]
+    )
+  end
+
+  desc "Build and upload to Play Store beta track"
+  lane :beta do
+    gradle(task: "clean")
+    gradle(
+      task: "bundleRelease",
+      project_dir: "../",
+      properties: {
+        "android.injected.signing.store.file" => ENV["ANDROID_KEYSTORE_PATH"],
+        "android.injected.signing.store.password" => ENV["ANDROID_KEYSTORE_PASSWORD"],
+        "android.injected.signing.key.alias" => ENV["ANDROID_KEY_ALIAS"],
+        "android.injected.signing.key.password" => ENV["ANDROID_KEY_PASSWORD"],
+      }
+    )
+    upload_to_play_store(
+      track: "beta",
+      skip_upload_apk: true,
+      json_key_data: ENV["PLAY_STORE_CONFIG_JSON"]
+    )
+  end
+
+  desc "Build and upload to Play Store production (10% canary)"
+  lane :production do
+    gradle(task: "clean")
+    gradle(
+      task: "bundleRelease",
+      project_dir: "../",
+      properties: {
+        "android.injected.signing.store.file" => ENV["ANDROID_KEYSTORE_PATH"],
+        "android.injected.signing.store.password" => ENV["ANDROID_KEYSTORE_PASSWORD"],
+        "android.injected.signing.key.alias" => ENV["ANDROID_KEY_ALIAS"],
+        "android.injected.signing.key.password" => ENV["ANDROID_KEY_PASSWORD"],
+      }
+    )
+    upload_to_play_store(
+      track: "production",
+      rollout: "0.1",
+      skip_upload_apk: true,
+      json_key_data: ENV["PLAY_STORE_CONFIG_JSON"]
+    )
+  end
+end
