@@ -45,7 +45,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     try {
       final client = ref.read(supabaseClientProvider);
       await verifyOtp(
-        phone: widget.phone,
+        phone: '+549${widget.phone}',
         token: _code,
         client: client,
       );
@@ -145,7 +145,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                 onPressed: () async {
                   final client = ref.read(supabaseClientProvider);
                   final messenger = ScaffoldMessenger.of(context);
-                  await signInWithOtp(phone: widget.phone, client: client);
+                  await signInWithOtp(phone: '+549${widget.phone}', client: client);
                   if (!mounted) return;
                   messenger.showSnackBar(
                     const SnackBar(content: Text('Código reenviado')),

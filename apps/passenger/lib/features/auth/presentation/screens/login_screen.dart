@@ -34,8 +34,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
     try {
       final client = ref.read(supabaseClientProvider);
-      await signInWithOtp(phone: _phoneCtrl.text.trim(), client: client);
-      if (mounted) context.push(AppRoutes.otp, extra: _phoneCtrl.text.trim());
+      final digits = _phoneCtrl.text.trim();
+      // Supabase requires E.164 format. Argentine mobiles: +549 + local number.
+      await signInWithOtp(phone: '+549$digits', client: client);
+      // Pass raw digits to OTP screen — it reconstructs the full number itself.
+      if (mounted) context.push(AppRoutes.otp, extra: digits);
     } catch (e) {
       setState(() => _error = 'No pudimos enviar el código. Intentá de nuevo.');
     } finally {

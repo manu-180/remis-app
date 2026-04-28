@@ -8,6 +8,9 @@
     "node": ">=20.11"
   },
   "scripts": {
+    "env:sync": "node scripts/sync-env.mjs",
+    "env:check": "node scripts/sync-env.mjs --check",
+    "predev": "node scripts/sync-env.mjs --env dev",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",

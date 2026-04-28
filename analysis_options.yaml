@@ -1,0 +1,5 @@
+# Raíz del monorepo: exclusiones que aplican al analizar `flutter analyze .` o `packages/`.
+analyzer:
+  exclude:
+    - "**/node_modules/**"
+    - "**/.dart_tool/**"

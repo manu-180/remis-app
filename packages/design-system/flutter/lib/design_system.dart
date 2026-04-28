@@ -1,5 +1,3 @@
-library remis_design_system;
-
 export 'tokens.dart';
 export 'theme.dart';
 export 'widgets/r_button.dart';

@@ -29,12 +29,12 @@ ThemeData buildLightTheme() {
         color: kNeutral900Light,
       ),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: kNeutral100Light,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(RRadius.lg),
-        side: BorderSide(color: kNeutral200Light),
+        side: const BorderSide(color: kNeutral200Light),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
@@ -42,19 +42,19 @@ ThemeData buildLightTheme() {
       fillColor: kNeutral50Light,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(RRadius.md),
-        borderSide: BorderSide(color: kNeutral300Light),
+        borderSide: const BorderSide(color: kNeutral300Light),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(RRadius.md),
-        borderSide: BorderSide(color: kNeutral300Light),
+        borderSide: const BorderSide(color: kNeutral300Light),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(RRadius.md),
-        borderSide: BorderSide(color: kBrandPrimary, width: 1.5),
+        borderSide: const BorderSide(color: kBrandPrimary, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(RRadius.md),
-        borderSide: BorderSide(color: kDanger),
+        borderSide: const BorderSide(color: kDanger),
       ),
       hintStyle: inter(fontSize: RTextSize.base, color: kNeutral400Light),
       labelStyle: inter(fontSize: RTextSize.sm, color: kNeutral600Light),
@@ -127,12 +127,12 @@ ThemeData buildDarkTheme() {
         color: kNeutral900Dark,
       ),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: kNeutral100Dark,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(RRadius.lg),
-        side: BorderSide(color: kNeutral200Dark),
+        side: const BorderSide(color: kNeutral200Dark),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
@@ -140,19 +140,19 @@ ThemeData buildDarkTheme() {
       fillColor: kNeutral50Dark,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(RRadius.md),
-        borderSide: BorderSide(color: kNeutral300Dark),
+        borderSide: const BorderSide(color: kNeutral300Dark),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(RRadius.md),
-        borderSide: BorderSide(color: kNeutral300Dark),
+        borderSide: const BorderSide(color: kNeutral300Dark),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(RRadius.md),
-        borderSide: BorderSide(color: kBrandPrimaryDark, width: 1.5),
+        borderSide: const BorderSide(color: kBrandPrimaryDark, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(RRadius.md),
-        borderSide: BorderSide(color: kDangerDark),
+        borderSide: const BorderSide(color: kDangerDark),
       ),
       hintStyle: inter(fontSize: RTextSize.base, color: kNeutral400Dark),
       labelStyle: inter(fontSize: RTextSize.sm, color: kNeutral600Dark),

@@ -1,0 +1,56 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "env: sync (dev)",
+      "type": "shell",
+      "command": "node",
+      "args": ["scripts/sync-env.mjs", "--env", "dev"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "env: sync (stg)",
+      "type": "shell",
+      "command": "node",
+      "args": ["scripts/sync-env.mjs", "--env", "stg"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "env: sync (prd)",
+      "type": "shell",
+      "command": "node",
+      "args": ["scripts/sync-env.mjs", "--env", "prd"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "env: sync (all)",
+      "type": "shell",
+      "command": "node",
+      "args": ["scripts/sync-env.mjs"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

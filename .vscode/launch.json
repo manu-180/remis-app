@@ -1,0 +1,73 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "driver (dev)",
+      "request": "launch",
+      "type": "dart",
+      "program": "apps/driver/lib/main.dart",
+      "cwd": "${workspaceFolder}/apps/driver",
+      "preLaunchTask": "env: sync (dev)",
+      "args": [
+        "--dart-define-from-file=${workspaceFolder}/packages/flutter-core/env/dev.json"
+      ]
+    },
+    {
+      "name": "driver (stg)",
+      "request": "launch",
+      "type": "dart",
+      "program": "apps/driver/lib/main.dart",
+      "cwd": "${workspaceFolder}/apps/driver",
+      "preLaunchTask": "env: sync (stg)",
+      "args": [
+        "--dart-define-from-file=${workspaceFolder}/packages/flutter-core/env/stg.json"
+      ]
+    },
+    {
+      "name": "driver (prd)",
+      "request": "launch",
+      "type": "dart",
+      "program": "apps/driver/lib/main.dart",
+      "cwd": "${workspaceFolder}/apps/driver",
+      "preLaunchTask": "env: sync (prd)",
+      "flutterMode": "release",
+      "args": [
+        "--dart-define-from-file=${workspaceFolder}/packages/flutter-core/env/prd.json"
+      ]
+    },
+    {
+      "name": "passenger (dev)",
+      "request": "launch",
+      "type": "dart",
+      "program": "apps/passenger/lib/main.dart",
+      "cwd": "${workspaceFolder}/apps/passenger",
+      "preLaunchTask": "env: sync (dev)",
+      "args": [
+        "--dart-define-from-file=${workspaceFolder}/packages/flutter-core/env/dev.json"
+      ]
+    },
+    {
+      "name": "passenger (stg)",
+      "request": "launch",
+      "type": "dart",
+      "program": "apps/passenger/lib/main.dart",
+      "cwd": "${workspaceFolder}/apps/passenger",
+      "preLaunchTask": "env: sync (stg)",
+      "args": [
+        "--dart-define-from-file=${workspaceFolder}/packages/flutter-core/env/stg.json"
+      ]
+    },
+    {
+      "name": "passenger (prd)",
+      "request": "launch",
+      "type": "dart",
+      "program": "apps/passenger/lib/main.dart",
+      "cwd": "${workspaceFolder}/apps/passenger",
+      "preLaunchTask": "env: sync (prd)",
+      "flutterMode": "release",
+      "args": [
+        "--dart-define-from-file=${workspaceFolder}/packages/flutter-core/env/prd.json"
+      ]
+    }
+  ]
+}

@@ -18,7 +18,15 @@ class Env {
   static bool get isProd => environment == 'prd';
 
   static void validate() {
-    assert(supabaseUrl.isNotEmpty, 'SUPABASE_URL must be defined');
-    assert(supabaseAnonKey.isNotEmpty, 'SUPABASE_ANON_KEY must be defined');
+    assert(
+      supabaseUrl.isNotEmpty,
+      'SUPABASE_URL is empty. Run with --dart-define-from-file pointing to '
+      'packages/flutter-core/env/dev.json (see .vscode/launch.json "driver (dev env)").',
+    );
+    assert(
+      supabaseAnonKey.isNotEmpty,
+      'SUPABASE_ANON_KEY is empty. Same as SUPABASE_URL: pass dart-define-from-file '
+      'or individual --dart-define=SUPABASE_ANON_KEY=... at build/run.',
+    );
   }
 }
