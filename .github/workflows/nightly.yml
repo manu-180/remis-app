@@ -1,0 +1,92 @@
+name: Nightly tests
+
+on:
+  schedule:
+    - cron: '0 3 * * *'  # 3am UTC daily
+  workflow_dispatch:       # allow manual trigger
+
+jobs:
+  e2e-dispatcher:
+    name: E2E — Dispatcher (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright browsers
+        working-directory: apps/dispatcher
+        run: npx playwright install chromium --with-deps
+      - name: Start Supabase local
+        run: supabase start
+      - name: Build dispatcher
+        working-directory: apps/dispatcher
+        run: pnpm build
+      - name: Run E2E tests
+        working-directory: apps/dispatcher
+        run: pnpm test:e2e
+        env:
+          E2E_BASE_URL: http://localhost:3001
+          SUPABASE_URL: http://localhost:54321
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_LOCAL }}
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/dispatcher/playwright-report/
+          retention-days: 7
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop
+
+  flutter-integration:
+    name: Flutter integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.3'
+          channel: stable
+          cache: true
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start Supabase local
+        run: supabase start
+      - name: Driver integration tests
+        working-directory: apps/driver
+        run: flutter test integration_test/ --tags e2e
+        continue-on-error: true
+      - name: Passenger integration tests
+        working-directory: apps/passenger
+        run: flutter test integration_test/ --tags e2e
+        continue-on-error: true
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop
+
+  flutter-golden:
+    name: Flutter golden tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.3'
+          channel: stable
+          cache: true
+      - name: Driver golden tests
+        working-directory: apps/driver
+        run: flutter test --tags golden
+        continue-on-error: true
