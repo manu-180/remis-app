@@ -152,10 +152,17 @@ for (const envName of targets) {
     continue;
   }
 
-  // Flutter JSON
+  // Flutter JSON (paquete compartido — usado por driver)
   const jsonPath = join(ROOT, 'packages/flutter-core/env', `${envName}.json`);
   writeJson(jsonPath, vars, envName);
   console.log(`✅ [${envName}] ${jsonPath.replace(ROOT, '.')}`);
+
+  // Flutter passenger (tiene su propio env/ por ahora)
+  if (envName === 'dev') {
+    const passengerJsonPath = join(ROOT, 'apps/passenger/env', `${envName}.json`);
+    writeJson(passengerJsonPath, vars, envName);
+    console.log(`✅ [${envName}] ${passengerJsonPath.replace(ROOT, '.')}`);
+  }
 
   // Next.js apps (solo para 'dev' por defecto; cambiar manualmente para deploy)
   if (envName === 'dev') {
