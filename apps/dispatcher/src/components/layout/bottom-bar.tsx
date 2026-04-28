@@ -5,6 +5,7 @@ import { HelpCircle, MessageSquare, Bell, Clock, Wifi, WifiOff } from 'lucide-re
 import { subscribeToConnectionStatus } from '@/lib/supabase/realtime';
 import { useUIStore } from '@/stores/ui-store';
 import { useShortcutHelp } from '@/hooks/use-shortcut-help';
+import { AlertsBar } from '@/components/alerts-bar';
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
@@ -18,24 +19,29 @@ const STATUS_CONFIG: Record<
 };
 
 const SHORTCUTS_TABLE: [string, string][] = [
-  ['Espacio',  'Nuevo pedido'],
-  ['F1',       'Guardar'],
-  ['F2',       'Pickup (×2 → destino)'],
-  ['F3',       'Teléfono'],
-  ['A',        'Asignar'],
-  ['M',        'Designar chofer'],
-  ['E',        'Editar'],
-  ['C',        'Cancelar'],
-  ['H',        'Hold'],
-  ['R',        'Reasignar'],
-  ['S',        'Buscar global'],
-  ['F9',       'Mensaje al chofer'],
-  ['Tab',      'Ciclar paneles'],
-  ['Esc',      'Cerrar'],
-  ['Ctrl+Z',   'Deshacer asignación (30s)'],
-  ['⌘K',       'Paleta de comandos'],
-  ['⌘1/2/3',   'Densidad'],
-  ['?',        'Esta ayuda'],
+  ['Espacio',       'Nuevo pedido'],
+  ['F1',            'Guardar form'],
+  ['F2',            'Pickup (×2 → destino)'],
+  ['F3',            'Teléfono'],
+  ['F5',            'Toggle ahora/programado'],
+  ['A',             'Asignar pedido seleccionado'],
+  ['M',             'Designar manualmente'],
+  ['E',             'Editar pedido'],
+  ['C',             'Cancelar pedido'],
+  ['H',             'Hold pedido'],
+  ['R',             'Reasignar'],
+  ['S / ⌘K',        'Buscar / Paleta'],
+  ['F9',            'Mensaje al chofer'],
+  ['Tab',           'Ciclar paneles →'],
+  ['Shift+Tab',     'Ciclar paneles ←'],
+  ['Esc',           'Cerrar modal/panel'],
+  ['Ctrl+Z',        'Deshacer asignación (30s)'],
+  ['1–9',           'Seleccionar sugerido N'],
+  ['[ / ]',         'Navegar cola'],
+  ['⌘1/2/3',        'Densidad'],
+  ['⌘D',            'Toggle tema'],
+  ['⌘L',            'Bloquear pantalla'],
+  ['?',             'Esta ayuda'],
 ];
 
 export function BottomBar() {
@@ -52,6 +58,7 @@ export function BottomBar() {
 
   return (
     <>
+      <AlertsBar />
       <footer
         className="col-span-3 flex items-center gap-4 px-4 border-t border-[var(--neutral-200)] bg-[var(--neutral-50)]"
         style={{ height: '44px' }}

@@ -3,6 +3,7 @@ import { getSupabaseServerClient } from '@/lib/supabase/server';
 import { AppShell } from '@/components/layout/app-shell';
 import { CommandPalette } from '@/components/command-palette';
 import { DensityHotkeys } from '@/components/layout/density-hotkeys';
+import { LockScreen } from '@/components/lock-screen';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await getSupabaseServerClient();
@@ -25,6 +26,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <AppShell>{children}</AppShell>
       <CommandPalette />
       <DensityHotkeys />
+      <LockScreen />
     </>
   );
 }

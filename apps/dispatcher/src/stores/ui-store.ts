@@ -11,12 +11,17 @@ interface UIState {
   theme: Theme;
   isCommandPaletteOpen: boolean;
   isShortcutHelpOpen: boolean;
+  isLocked: boolean;
+  soundVolume: number;
 
   setDensity: (d: Density) => void;
   setTheme: (t: Theme) => void;
   openCommandPalette: () => void;
   closeCommandPalette: () => void;
   toggleShortcutHelp: () => void;
+  lock: () => void;
+  unlock: () => void;
+  setSoundVolume: (v: number) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -26,6 +31,8 @@ export const useUIStore = create<UIState>()(
       theme: 'dark',
       isCommandPaletteOpen: false,
       isShortcutHelpOpen: false,
+      isLocked: false,
+      soundVolume: 0.6,
 
       setDensity: (density) => {
         set({ density });
@@ -39,10 +46,13 @@ export const useUIStore = create<UIState>()(
       closeCommandPalette: () => set({ isCommandPaletteOpen: false }),
       toggleShortcutHelp: () =>
         set((s) => ({ isShortcutHelpOpen: !s.isShortcutHelpOpen })),
+      lock: () => set({ isLocked: true }),
+      unlock: () => set({ isLocked: false }),
+      setSoundVolume: (soundVolume) => set({ soundVolume }),
     }),
     {
       name: 'dispatcher-ui',
-      partialize: (s) => ({ density: s.density, theme: s.theme }),
+      partialize: (s) => ({ density: s.density, theme: s.theme, soundVolume: s.soundVolume }),
       onRehydrateStorage: () => (state) => {
         if (state) {
           document.documentElement.dataset['density'] = state.density;

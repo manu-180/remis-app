@@ -7,15 +7,33 @@ import { CenterColumn } from './center-column';
 import { RightColumn }  from './right-column';
 import { BottomBar }    from './bottom-bar';
 import { useRidesStore } from '@/stores/rides-store';
-import { playNewRideSound } from '@/lib/sounds';
+import { playNewRideSound, registerAudioGesture } from '@/lib/sounds';
+import { useBroadcastSync } from '@/hooks/use-broadcast-sync';
+import { useAppShortcuts } from '@/hooks/use-app-shortcuts';
+import { useBrowserNotifications } from '@/hooks/use-browser-notifications';
 
 export function AppShell({ children }: { children?: React.ReactNode }) {
-  // Track previously seen ride IDs to detect new ones
   const previousIdsRef = useRef<Set<string>>(new Set());
   const blinkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  useBroadcastSync('primary');
+  useAppShortcuts();
+  const { requestPermission } = useBrowserNotifications();
+
   useEffect(() => {
-    // Initialize the set with currently known rides (no sound on mount)
+    void requestPermission();
+  }, [requestPermission]);
+
+  useEffect(() => {
+    const handler = () => {
+      registerAudioGesture();
+      window.removeEventListener('click', handler);
+    };
+    window.addEventListener('click', handler, { once: true });
+    return () => window.removeEventListener('click', handler);
+  }, []);
+
+  useEffect(() => {
     const initial = useRidesStore.getState().rides;
     initial.forEach((_, id) => previousIdsRef.current.add(id));
 
@@ -28,7 +46,7 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
     };
 
     const startBlink = () => {
-      if (blinkIntervalRef.current !== null) return; // already blinking
+      if (blinkIntervalRef.current !== null) return;
       let toggle = false;
       blinkIntervalRef.current = setInterval(() => {
         document.title = toggle ? 'RemisDespacho' : '(NUEVO) RemisDespacho';
@@ -48,13 +66,11 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
 
       currentIds.forEach((ride, id) => {
         if (!prev.has(id) && ride.status === 'requested') {
-          // New requested ride detected
           playNewRideSound();
           if (document.hidden) startBlink();
         }
       });
 
-      // Sync previous set to current
       const next = new Set<string>();
       currentIds.forEach((_, id) => next.add(id));
       previousIdsRef.current = next;
