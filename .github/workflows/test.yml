@@ -1,0 +1,87 @@
+name: Test (fast)
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+
+jobs:
+  sql-tests:
+    name: pgTAP SQL tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start Supabase local
+        run: supabase start
+      - name: Run pgTAP tests
+        run: supabase db test
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop
+
+  flutter-driver:
+    name: Flutter tests — driver
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.3'
+          channel: stable
+          cache: true
+      - name: Get dependencies
+        working-directory: apps/driver
+        run: flutter pub get
+      - name: Run tests with coverage
+        working-directory: apps/driver
+        run: flutter test --coverage
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: apps/driver/coverage/lcov.info
+          flags: driver
+          fail_ci_if_error: false
+
+  flutter-passenger:
+    name: Flutter tests — passenger
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.3'
+          channel: stable
+          cache: true
+      - name: Get dependencies
+        working-directory: apps/passenger
+        run: flutter pub get
+      - name: Run tests with coverage
+        working-directory: apps/passenger
+        run: flutter test --coverage
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: apps/passenger/coverage/lcov.info
+          flags: passenger
+          fail_ci_if_error: false
+
+  dispatcher-typecheck:
+    name: Dispatcher typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck dispatcher
+        working-directory: apps/dispatcher
+        run: pnpm typecheck
