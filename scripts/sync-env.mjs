@@ -87,6 +87,21 @@ function writeJson(targetPath, vars, envTag) {
   writeFileSync(targetPath, content, 'utf8');
 }
 
+function writeLocalProperties(targetPath, vars) {
+  // Lee el archivo existente y actualiza/agrega GOOGLE_MAPS_API_KEY
+  let content = existsSync(targetPath) ? readFileSync(targetPath, 'utf8') : '';
+  const key = 'GOOGLE_MAPS_API_KEY';
+  const value = vars.GOOGLE_MAPS_API_KEY ?? '';
+  const newLine = `${key}=${value}`;
+  if (content.includes(`${key}=`)) {
+    content = content.replace(new RegExp(`^${key}=.*$`, 'm'), newLine);
+  } else {
+    content = content.trimEnd() + '\n' + newLine + '\n';
+  }
+  if (checkOnly) return;
+  writeFileSync(targetPath, content, 'utf8');
+}
+
 function writeNextEnv(targetPath, vars) {
   const lines = [
     '# AUTO-GENERATED por scripts/sync-env.mjs — NO editar a mano.',
@@ -162,6 +177,15 @@ for (const envName of targets) {
     const passengerJsonPath = join(ROOT, 'apps/passenger/env', `${envName}.json`);
     writeJson(passengerJsonPath, vars, envName);
     console.log(`✅ [${envName}] ${passengerJsonPath.replace(ROOT, '.')}`);
+  }
+
+  // Android local.properties (para manifestPlaceholders en build.gradle.kts)
+  if (envName === 'dev') {
+    for (const app of ['driver', 'passenger']) {
+      const localPropsPath = join(ROOT, 'apps', app, 'android/local.properties');
+      writeLocalProperties(localPropsPath, vars);
+      console.log(`✅ [${envName}] ${localPropsPath.replace(ROOT, '.')} (GOOGLE_MAPS_API_KEY)`);
+    }
   }
 
   // Next.js apps (solo para 'dev' por defecto; cambiar manualmente para deploy)

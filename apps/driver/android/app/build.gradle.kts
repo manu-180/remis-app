@@ -1,8 +1,28 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+val localProps = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProps.load(localPropertiesFile.inputStream())
+}
+
+val keyProps = Properties()
+val keyPropertiesFile = rootProject.file("key.properties")
+if (keyPropertiesFile.exists()) {
+    keyProps.load(keyPropertiesFile.inputStream())
+}
+
+val hasReleaseSigning =
+    keyProps.getProperty("storeFile")?.isNotBlank() == true &&
+        keyProps.getProperty("storePassword")?.isNotBlank() == true &&
+        keyProps.getProperty("keyAlias")?.isNotBlank() == true &&
+        keyProps.getProperty("keyPassword")?.isNotBlank() == true
 
 android {
     namespace = "com.remis.remis_driver"
@@ -26,8 +46,18 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 
-        // Google Maps API key injected via --dart-define-from-file
-        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = ""
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = localProps.getProperty("GOOGLE_MAPS_API_KEY") ?: ""
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(keyProps.getProperty("storeFile"))
+                storePassword = keyProps.getProperty("storePassword")
+                keyAlias = keyProps.getProperty("keyAlias")
+                keyPassword = keyProps.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
@@ -36,7 +66,12 @@ android {
             isShrinkResources = false
         }
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                logger.warn("⚠️ key.properties no configurado. Release se firmará con debug keystore.")
+                signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = false
             isShrinkResources = false
         }

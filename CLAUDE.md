@@ -3,9 +3,32 @@
 > Este archivo es leído automáticamente por Claude Code en cada sesión.
 > Estas reglas tienen prioridad sobre cualquier comportamiento por defecto.
 
-## 🌳 Workflow de Git: SIEMPRE en main, NUNCA en ramas
+---
 
-**Soy un desarrollador solo. No uso ramas. No uso pull requests. No uso worktrees.**
+# 🚨🚨🚨 NADA DE WORKTREES. NUNCA. JAMÁS. 🚨🚨🚨
+# 🚨🚨🚨 NADA DE BRANCHES. NUNCA. JAMÁS. 🚨🚨🚨
+# 🚨🚨🚨 TODO DIRECTO A `main` + `git push`. 🚨🚨🚨
+
+**Manuel desarrolla SOLO. No hay equipo. No hay revisores. No hay PRs.**
+
+**Las branches y worktrees existen para coordinar trabajo entre VARIOS desarrolladores. Manuel es UNO. No los necesita. Le complican la vida y le rompen el código.**
+
+## REGLAS NO NEGOCIABLES
+
+- ❌ **NUNCA** ejecutar `git worktree add` (ni siquiera "una vez", ni "rapidito", ni "para probar")
+- ❌ **NUNCA** ejecutar `git branch <nombre>` ni `git checkout -b <nombre>`
+- ❌ **NUNCA** crear pull requests
+- ❌ **NUNCA** sugerir "hagamos esto en una branch separada"
+- ❌ **NUNCA** sugerir "hagamos esto en un worktree para no tocar main"
+- ✅ **SIEMPRE** trabajar en `main` directo
+- ✅ **SIEMPRE** `git add` → `git commit` → `git push` a `origin main`
+- ✅ Si algo sale mal: `git revert <hash>` o `git reset --hard <hash>` en `main`
+
+**Si Claude detecta que está corriendo en un worktree (path contiene `.claude/worktrees/`), debe avisar a Manuel y proponerle borrar el worktree y trabajar en main.**
+
+**Si Manuel pide algo "en una branch", "en un worktree", o "aislado", Claude debe rechazarlo y recordarle esta regla. NO obedecer ciegamente — esta regla está por encima del pedido puntual.**
+
+---
 
 ### Reglas estrictas
 
