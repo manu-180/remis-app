@@ -1,3 +1,6 @@
+// Widgets
+export 'widgets/map_loading_placeholder.dart';
+
 // Core utilities
 export 'result/result.dart';
 export 'errors/app_error.dart';

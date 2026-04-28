@@ -31,6 +31,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _locationPermissionGranted = false;
   bool _showDisclosure = true;
   bool _loadingLocation = false;
+  bool _mapReady = false;
 
   static const _defaultCenter = LatLng(-36.6167, -64.2833); // Santa Rosa, La Pampa
 
@@ -186,9 +187,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       setState(() => _pickupLocation = pos),
                 ),
             },
-            onMapCreated: (ctrl) => _mapController = ctrl,
+            onMapCreated: (ctrl) {
+              _mapController = ctrl;
+              setState(() => _mapReady = true);
+            },
             onTap: (pos) => setState(() => _pickupLocation = pos),
           ),
+
+          // ── Loading placeholder (se desvanece cuando el mapa está listo) ──
+          MapLoadingPlaceholder(visible: !_mapReady),
 
           // ── Top bar (translucent, no blur per spec) ──
           Positioned(

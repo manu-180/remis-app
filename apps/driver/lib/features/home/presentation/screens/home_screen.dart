@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:remis_design_system/remis_design_system.dart';
+import 'package:remis_flutter_core/remis_flutter_core.dart';
 import 'package:remis_driver/features/ride/data/ride_model.dart';
 import 'package:remis_driver/features/ride/presentation/providers/ride_controller.dart';
 import 'package:remis_driver/features/ride/presentation/screens/ride_completed_screen.dart';
@@ -35,6 +36,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _batteryLevel = 100;
   Timer? _batteryTimer;
   bool _offerModalOpen = false;
+  bool _mapReady = false;
 
   @override
   void initState() {
@@ -168,14 +170,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         body: Stack(
           children: [
-            const GoogleMap(
+            GoogleMap(
               initialCameraPosition: _initialPosition,
               myLocationEnabled: false,
               myLocationButtonEnabled: false,
               zoomControlsEnabled: false,
               mapToolbarEnabled: false,
               compassEnabled: false,
+              onMapCreated: (_) => setState(() => _mapReady = true),
             ),
+            MapLoadingPlaceholder(visible: !_mapReady),
             if (!isActive) _EmptyStateOverlay(),
             Positioned(
               left: 0,

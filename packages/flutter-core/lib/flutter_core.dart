@@ -1,5 +1,6 @@
 library flutter_core;
 
+export 'widgets/map_loading_placeholder.dart';
 export 'location_utils/address_format.dart';
 export 'location_utils/bounds.dart';
 export 'location_utils/geolocator_provider.dart';
