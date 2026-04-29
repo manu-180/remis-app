@@ -3,7 +3,6 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -12,6 +11,18 @@ val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localProps.load(localPropertiesFile.inputStream())
 }
+
+val keyProps = Properties()
+val keyPropertiesFile = rootProject.file("key.properties")
+if (keyPropertiesFile.exists()) {
+    keyProps.load(keyPropertiesFile.inputStream())
+}
+
+val hasReleaseSigning =
+    keyProps.getProperty("storeFile")?.isNotBlank() == true &&
+        keyProps.getProperty("storePassword")?.isNotBlank() == true &&
+        keyProps.getProperty("keyAlias")?.isNotBlank() == true &&
+        keyProps.getProperty("keyPassword")?.isNotBlank() == true
 
 android {
     namespace = "com.remis.passenger"
@@ -40,11 +51,27 @@ android {
             ?: ""
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(keyProps.getProperty("storeFile"))
+                storePassword = keyProps.getProperty("storePassword")
+                keyAlias = keyProps.getProperty("keyAlias")
+                keyPassword = keyProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                logger.warn("⚠️ key.properties no configurado. Release se firmará con debug keystore.")
+                signingConfigs.getByName("debug")
+            }
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
