@@ -15,7 +15,7 @@ import '../../../ride_request/data/models/ride_model.dart';
 import '../../../ride_request/data/models/route_result.dart';
 import '../../../ride_request/data/ride_providers.dart';
 import '../../../ride_request/data/ride_repository.dart';
-import '../../../ride_request/presentation/screens/destination_search_screen.dart';
+import '../../../ride_request/presentation/widgets/destination_search_sheet.dart';
 import '../../../ride_request/presentation/widgets/ride_confirmation_sheet.dart';
 import '../widgets/map_style.dart';
 import '../widgets/route_info_chip.dart';
@@ -112,18 +112,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _onDisclosureDismiss() => setState(() => _showDisclosure = false);
 
   void _openDestinationSearch() {
-    Navigator.push<DestinationResult>(
-      context,
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => DestinationSearchScreen(
-          currentLocation: _pickupLocation,
-          onDestinationSelected: (result) {
-            Navigator.pop(context);
-            _onDestinationSelected(result);
+    final sheetController = DraggableScrollableController();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      // Translucent barrier — the map stays visible behind the sheet.
+      barrierColor: Colors.black.withValues(alpha: 0.18),
+      backgroundColor: Colors.transparent,
+      // Don't reserve space for status bar — the sheet handles its own padding
+      // and we want the map readable above it.
+      useSafeArea: false,
+      builder: (sheetCtx) {
+        return DraggableScrollableSheet(
+          controller: sheetController,
+          initialChildSize: 0.42,
+          minChildSize: 0.42,
+          maxChildSize: 0.92,
+          snap: true,
+          snapSizes: const [0.42, 0.92],
+          expand: false,
+          builder: (_, scrollController) {
+            return DestinationSearchSheet(
+              scrollController: scrollController,
+              currentLocation: _pickupLocation,
+              onRequestExpand: () {
+                if (sheetController.isAttached &&
+                    sheetController.size < 0.9) {
+                  sheetController.animateTo(
+                    0.92,
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                  );
+                }
+              },
+              onRequestCollapse: () {
+                if (sheetController.isAttached &&
+                    sheetController.size > 0.5) {
+                  sheetController.animateTo(
+                    0.42,
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                  );
+                }
+              },
+              onDestinationSelected: (result) {
+                Navigator.of(sheetCtx).pop();
+                _onDestinationSelected(result);
+              },
+            );
           },
-        ),
-      ),
+        );
+      },
     );
   }
 

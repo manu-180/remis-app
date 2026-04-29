@@ -9,6 +9,7 @@ import '../../data/models/destination_result.dart';
 import '../../data/models/place_prediction.dart';
 import '../../data/ride_providers.dart';
 import '../../data/services/places_service.dart';
+import 'tile_skeleton.dart';
 
 // ---------------------------------------------------------------------------
 // PostGIS WKT parse helper
@@ -26,54 +27,81 @@ LatLng? _parseGeoPoint(dynamic val) {
 }
 
 // ---------------------------------------------------------------------------
-// Screen
+// Sheet
 // ---------------------------------------------------------------------------
 
-/// Full-screen overlay shown when the passenger taps "¿A dónde vamos?".
+/// Bottom-sheet variant of the destination search.
 ///
-/// Calls [onDestinationSelected] with the chosen [DestinationResult] and pops.
-/// Closing without a selection pops without invoking the callback.
-///
-/// Live results come from Google Places Autocomplete (Argentina-biased).
-/// Frecuentes/Recientes/Sugerencias-locales remain as fallbacks for an
-/// empty query and as quick-pick rows.
-class DestinationSearchScreen extends ConsumerStatefulWidget {
-  const DestinationSearchScreen({
+/// Mounted inside a [DraggableScrollableSheet] so the map remains visible
+/// behind. The sheet auto-expands when the input is focused via
+/// [onRequestExpand]; collapses to the initial snap via [onRequestCollapse]
+/// when focus is lost while the query is empty.
+class DestinationSearchSheet extends ConsumerStatefulWidget {
+  const DestinationSearchSheet({
     super.key,
+    required this.scrollController,
     required this.onDestinationSelected,
+    required this.onRequestExpand,
+    required this.onRequestCollapse,
     this.currentLocation,
   });
 
+  final ScrollController scrollController;
   final void Function(DestinationResult result) onDestinationSelected;
+  final VoidCallback onRequestExpand;
+  final VoidCallback onRequestCollapse;
   final LatLng? currentLocation;
 
   @override
-  ConsumerState<DestinationSearchScreen> createState() =>
-      _DestinationSearchScreenState();
+  ConsumerState<DestinationSearchSheet> createState() =>
+      _DestinationSearchSheetState();
 }
 
-class _DestinationSearchScreenState
-    extends ConsumerState<DestinationSearchScreen> {
+class _DestinationSearchSheetState
+    extends ConsumerState<DestinationSearchSheet> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   String _query = '';            // raw, used for client-side filter
   String _debouncedQuery = '';   // debounced, used for Places API
+  bool _isTyping = false;        // true while debounce timer is pending
   Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_onFocusChange);
+  }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _focusNode.removeListener(_onFocusChange);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
+  void _onFocusChange() {
+    if (_focusNode.hasFocus) {
+      widget.onRequestExpand();
+    } else if (_query.isEmpty) {
+      widget.onRequestCollapse();
+    }
+  }
+
   void _onQueryChanged(String value) {
-    setState(() => _query = value.trim().toLowerCase());
+    final trimmed = value.trim();
+    setState(() {
+      _query = trimmed.toLowerCase();
+      _isTyping = trimmed.length >= 2 && trimmed != _debouncedQuery;
+    });
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 400), () {
+    _debounce = Timer(const Duration(milliseconds: 180), () {
       if (!mounted) return;
-      setState(() => _debouncedQuery = value.trim());
+      setState(() {
+        _debouncedQuery = trimmed;
+        _isTyping = false;
+      });
     });
   }
 
@@ -82,7 +110,6 @@ class _DestinationSearchScreenState
 
   void _select(DestinationResult result) {
     widget.onDestinationSelected(result);
-    Navigator.of(context).pop();
   }
 
   @override
@@ -94,102 +121,126 @@ class _DestinationSearchScreenState
     final recentAsync = ref.watch(recentDestinationsProvider);
     final poisAsync = ref.watch(placePoisProvider);
 
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ----------------------------------------------------------------
-            // Top bar: close + title
-            // ----------------------------------------------------------------
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 8, 16, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    tooltip: 'Cerrar',
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
+    return Material(
+      color: theme.colorScheme.surface,
+      elevation: 16,
+      shadowColor: Colors.black.withValues(alpha: 0.4),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ----------------------------------------------------------------
+          // Drag handle
+          // ----------------------------------------------------------------
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(top: 10, bottom: 6),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+
+          // ----------------------------------------------------------------
+          // Title row + close button
+          // ----------------------------------------------------------------
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 8, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
                     '¿A dónde vamos?',
-                    style: theme.textTheme.headlineMedium,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ],
-              ),
-            ),
-
-            // ----------------------------------------------------------------
-            // Search field
-            // ----------------------------------------------------------------
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: TextField(
-                controller: _controller,
-                focusNode: _focusNode,
-                autofocus: true,
-                onChanged: _onQueryChanged,
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  hintText: 'Ingresá una dirección o lugar',
-                  prefixIcon: Icon(
-                    Icons.search,
-                    color: isDark
-                        ? AppColors.neutralD500
-                        : AppColors.neutral500,
-                  ),
-                  suffixIcon: _query.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _controller.clear();
-                            _onQueryChanged('');
-                          },
-                        )
-                      : null,
                 ),
-              ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Cerrar',
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
             ),
+          ),
 
-            // ----------------------------------------------------------------
-            // Results list
-            // ----------------------------------------------------------------
-            Expanded(
-              child: ListView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.only(bottom: 24),
-                children: [
-                  _PlacesSection(
-                    query: _debouncedQuery,
-                    bias: widget.currentLocation,
-                    onSelect: _select,
-                  ),
-                  _FrequentesSection(
-                    asyncValue: frequentAsync,
-                    query: _query,
-                    matches: _matches,
-                    onSelect: _select,
-                  ),
-                  _RecientesSection(
-                    asyncValue: recentAsync,
-                    query: _query,
-                    matches: _matches,
-                    onSelect: _select,
-                  ),
-                  _SugerenciasSection(
-                    asyncValue: poisAsync,
-                    query: _query,
-                    matches: _matches,
-                    onSelect: _select,
-                  ),
-                ],
+          // ----------------------------------------------------------------
+          // Search field
+          // ----------------------------------------------------------------
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              autofocus: true,
+              onChanged: _onQueryChanged,
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: 'Ingresá una dirección o lugar',
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: isDark
+                      ? AppColors.neutralD500
+                      : AppColors.neutral500,
+                ),
+                suffixIcon: _query.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _controller.clear();
+                          _onQueryChanged('');
+                          _focusNode.requestFocus();
+                        },
+                      )
+                    : null,
               ),
             ),
-          ],
-        ),
+          ),
+
+          // ----------------------------------------------------------------
+          // Results list — receives the DraggableScrollableSheet's controller
+          // so dragging the list at the top edge drags the sheet itself.
+          // ----------------------------------------------------------------
+          Expanded(
+            child: ListView(
+              controller: widget.scrollController,
+              keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.only(bottom: 24),
+              children: [
+                _PlacesSection(
+                  query: _debouncedQuery,
+                  isTyping: _isTyping,
+                  bias: widget.currentLocation,
+                  onSelect: _select,
+                ),
+                _FrequentesSection(
+                  asyncValue: frequentAsync,
+                  query: _query,
+                  matches: _matches,
+                  onSelect: _select,
+                ),
+                _RecientesSection(
+                  asyncValue: recentAsync,
+                  query: _query,
+                  matches: _matches,
+                  onSelect: _select,
+                ),
+                _SugerenciasSection(
+                  asyncValue: poisAsync,
+                  query: _query,
+                  matches: _matches,
+                  onSelect: _select,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -271,7 +322,13 @@ class _FrequentesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return asyncValue.when(
-      loading: () => const _SectionLoading(),
+      loading: () => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          _SectionHeader('Frecuentes'),
+          SectionSkeleton(count: 2),
+        ],
+      ),
       error: (_, __) => const SizedBox.shrink(),
       data: (rows) {
         final filtered = rows.where((r) {
@@ -329,7 +386,13 @@ class _RecientesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return asyncValue.when(
-      loading: () => const _SectionLoading(),
+      loading: () => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          _SectionHeader('Recientes'),
+          SectionSkeleton(count: 3),
+        ],
+      ),
       error: (_, __) => const SizedBox.shrink(),
       data: (rows) {
         final filtered = rows.where((r) {
@@ -385,7 +448,13 @@ class _SugerenciasSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return asyncValue.when(
-      loading: () => const _SectionLoading(),
+      loading: () => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          _SectionHeader('Sugerencias del pueblo'),
+          SectionSkeleton(count: 3),
+        ],
+      ),
       error: (_, __) => const SizedBox.shrink(), // table may not exist yet
       data: (rows) {
         final filtered = rows.where((r) {
@@ -424,50 +493,47 @@ class _SugerenciasSection extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Shared loading indicator for a section
-// ---------------------------------------------------------------------------
-
-class _SectionLoading extends StatelessWidget {
-  const _SectionLoading();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 12),
-      child: Center(
-        child: SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Google Places suggestions (live)
 // ---------------------------------------------------------------------------
 
 class _PlacesSection extends ConsumerWidget {
   const _PlacesSection({
     required this.query,
+    required this.isTyping,
     required this.bias,
     required this.onSelect,
   });
 
   final String query;
+  final bool isTyping;
   final LatLng? bias;
   final void Function(DestinationResult) onSelect;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Show skeletons while the user is typing (before debounce fires) so the
+    // UI feels instantly responsive.
+    if (isTyping && query.trim().length < 2) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          _SectionHeader('Sugerencias'),
+          SectionSkeleton(count: 4),
+        ],
+      );
+    }
     if (query.trim().length < 2) return const SizedBox.shrink();
     final async = ref.watch(
       placePredictionsProvider((query: query, bias: bias)),
     );
     return async.when(
-      loading: () => const _SectionLoading(),
+      loading: () => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          _SectionHeader('Sugerencias'),
+          SectionSkeleton(count: 4),
+        ],
+      ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Text(
