@@ -1,3 +1,9 @@
+// Tell flutter_background_geolocation to compile against play-services-location:21.x
+// so it picks tslocationmanager-v21 instead of the default 20.x binary.
+// Without this, geolocator_android (which uses 21.x) lands in the APK while
+// Transistorsoft's code was compiled expecting the 20.x API → IncompatibleClassChangeError.
+extra["playServicesLocationVersion"] = "21.3.0"
+
 allprojects {
     repositories {
         google()
