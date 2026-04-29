@@ -365,7 +365,7 @@ class _TranslucentAppBar extends StatelessWidget implements PreferredSizeWidget 
                 onTap: onSOS,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: RSpacing.s10,
+                    horizontal: 10,
                     vertical: RSpacing.s6,
                   ),
                   decoration: BoxDecoration(

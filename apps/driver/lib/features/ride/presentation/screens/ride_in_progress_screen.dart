@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:remis_design_system/remis_design_system.dart';
 import 'package:remis_driver/features/ride/data/ride_model.dart';
@@ -206,16 +205,44 @@ class _RideInProgressScreenState extends State<RideInProgressScreen>
           ),
         ),
         actions: [
-          IconButton(
-            onPressed: widget.onSOS,
-            icon: const Icon(
-              Icons.warning_amber_rounded,
-              color: kDanger,
-              size: 28,
+          Padding(
+            padding: const EdgeInsets.only(right: RSpacing.s8),
+            child: GestureDetector(
+              onTap: widget.onSOS,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: RSpacing.s6,
+                ),
+                decoration: BoxDecoration(
+                  color: kDanger,
+                  borderRadius: BorderRadius.circular(RRadius.full),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kDanger.withValues(alpha: 0.45),
+                      blurRadius: 10,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.shield, color: Colors.white, size: 13),
+                    const SizedBox(width: RSpacing.s4),
+                    Text(
+                      'SOS',
+                      style: interTight(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.5,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            tooltip: 'SOS',
           ),
-          const SizedBox(width: RSpacing.s8),
         ],
       ),
       floatingActionButton: Padding(
