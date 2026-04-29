@@ -13,19 +13,21 @@ interface DrawerProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   width?: keyof typeof widths;
+  side?: 'left' | 'right';
 }
 
-export function Drawer({ open, onOpenChange, title, children, footer, width = 'md' }: DrawerProps) {
+export function Drawer({ open, onOpenChange, title, children, footer, width = 'md', side = 'right' }: DrawerProps) {
   return (
     <Dialog.Root {...(open !== undefined ? { open } : {})} {...(onOpenChange ? { onOpenChange } : {})}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 duration-300" />
         <Dialog.Content
           className={cn(
-            'fixed right-0 top-0 z-50 h-full flex flex-col bg-[var(--neutral-0)] shadow-[var(--shadow-xl)]',
-            'data-[state=open]:animate-in data-[state=closed]:animate-out',
-            'data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right',
-            'duration-300'
+            'fixed top-0 z-50 h-full flex flex-col bg-[var(--neutral-0)] shadow-[var(--shadow-xl)]',
+            'data-[state=open]:animate-in data-[state=closed]:animate-out duration-300',
+            side === 'right'
+              ? 'right-0 data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right'
+              : 'left-0 data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left'
           )}
           style={{ width: widths[width] }}
         >

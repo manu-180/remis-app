@@ -1,14 +1,18 @@
+import { PageHeader } from '@/components/admin/page-header';
+import { Card, CardContent } from '@/components/ui/card';
+
 export default function AdminRidesPage() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--neutral-50)] p-12">
-      <h1 className="text-3xl font-bold tracking-tight text-[var(--neutral-900)]">Viajes</h1>
-      <span className="inline-flex items-center gap-2 text-sm text-[var(--neutral-500)] mt-3">
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--brand-accent)] opacity-60" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--brand-accent)]" />
-        </span>
-        En construcción
-      </span>
+    <div className="space-y-6 p-6 lg:p-8">
+      <PageHeader
+        title="Viajes"
+        description="Historial completo de viajes, estados y métricas."
+      />
+      <Card>
+        <CardContent className="py-12 text-center text-sm text-[var(--neutral-500)]">
+          En construcción
+        </CardContent>
+      </Card>
     </div>
   );
 }
