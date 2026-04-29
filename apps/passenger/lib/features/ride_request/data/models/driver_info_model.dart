@@ -1,5 +1,7 @@
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import 'geo_utils.dart';
+
 class DriverInfoModel {
   const DriverInfoModel({
     required this.id,
@@ -23,15 +25,7 @@ class DriverInfoModel {
   final LatLng? location;
   final double? heading;
 
-  /// Parses a PostGIS WKT geography value: "SRID=4326;POINT(lng lat)"
-  static LatLng? _parseGeo(dynamic val) {
-    if (val == null) return null;
-    final s = val.toString();
-    final match = RegExp(r'POINT\(([^ ]+) ([^)]+)\)').firstMatch(s);
-    if (match == null) return null;
-    // PostGIS POINT stores (longitude latitude), so group(1)=lng, group(2)=lat
-    return LatLng(double.parse(match.group(2)!), double.parse(match.group(1)!));
-  }
+  static LatLng? _parseGeo(dynamic val) => tryParseGeoPoint(val);
 
   /// Builds from a flat row from the `driver_current_location` stream.
   /// Also works for the nested join result from `getDriverInfo` by accepting

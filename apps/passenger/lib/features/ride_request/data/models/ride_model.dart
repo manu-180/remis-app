@@ -1,5 +1,7 @@
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import 'geo_utils.dart';
+
 enum RideStatus {
   requested,
   assigned,
@@ -79,23 +81,13 @@ class RideModel {
   final double? distanceMeters;
 
   factory RideModel.fromMap(Map<String, dynamic> map) {
-    // Parse geography point: Supabase returns "SRID=4326;POINT(lng lat)"
-    LatLng parseGeo(dynamic val) {
-      if (val == null) throw FormatException('Missing required location field');
-      final s = val.toString();
-      final match = RegExp(r'POINT\(([^ ]+) ([^)]+)\)').firstMatch(s);
-      if (match == null) throw FormatException('Cannot parse WKT location: $s');
-      // PostGIS POINT stores (longitude latitude), so group(1)=lng, group(2)=lat
-      return LatLng(double.parse(match.group(2)!), double.parse(match.group(1)!));
-    }
-
     return RideModel(
       id: map['id'] as String,
       status: RideStatus.fromString(map['status'] as String? ?? 'requested'),
       pickupAddress: map['pickup_address'] as String?,
-      pickupLocation: parseGeo(map['pickup_location']),
+      pickupLocation: parseGeoPoint(map['pickup_location']),
       destAddress: map['dest_address'] as String?,
-      destLocation: map['dest_location'] != null ? parseGeo(map['dest_location']) : null,
+      destLocation: tryParseGeoPoint(map['dest_location']),
       estimatedFareArs: (map['estimated_fare_ars'] as num?)?.toDouble(),
       finalFareArs: (map['final_fare_ars'] as num?)?.toDouble(),
       paymentMethod: map['payment_method'] as String?,

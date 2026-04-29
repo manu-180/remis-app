@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 enum RideStatus {
@@ -125,11 +127,40 @@ class RideModel {
   static LatLng? _parseWkt(String? wkt) {
     if (wkt == null) return null;
     final match = RegExp(r'POINT\(([^ ]+) ([^)]+)\)').firstMatch(wkt);
-    if (match == null) return null;
-    final lng = double.tryParse(match.group(1)!);
-    final lat = double.tryParse(match.group(2)!);
-    if (lng == null || lat == null) return null;
-    return LatLng(lat, lng);
+    if (match != null) {
+      final lng = double.tryParse(match.group(1)!);
+      final lat = double.tryParse(match.group(2)!);
+      if (lng == null || lat == null) return null;
+      return LatLng(lat, lng);
+    }
+    // Supabase may return geometry as WKB hex — decode EWKB point
+    if (wkt.length >= 42 && RegExp(r'^[0-9a-fA-F]+$').hasMatch(wkt)) {
+      return _parseWkbPoint(wkt);
+    }
+    return null;
+  }
+
+  static LatLng _parseWkbPoint(String hex) {
+    final bytes = Uint8List.fromList(
+      List.generate(
+        hex.length ~/ 2,
+        (i) => int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16),
+      ),
+    );
+    final data = ByteData.sublistView(bytes);
+    final isLE = bytes[0] == 1;
+    final type = isLE
+        ? data.getUint32(1, Endian.little)
+        : data.getUint32(1, Endian.big);
+    final hasSrid = (type & 0x20000000) != 0;
+    final offset = 5 + (hasSrid ? 4 : 0);
+    final x = isLE
+        ? data.getFloat64(offset, Endian.little)
+        : data.getFloat64(offset, Endian.big);
+    final y = isLE
+        ? data.getFloat64(offset + 8, Endian.little)
+        : data.getFloat64(offset + 8, Endian.big);
+    return LatLng(y, x); // PostGIS: x=longitude, y=latitude
   }
 
   factory RideModel.fromMap(Map<String, dynamic> map) {
