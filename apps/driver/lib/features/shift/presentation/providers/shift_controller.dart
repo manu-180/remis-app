@@ -96,7 +96,12 @@ class ShiftController extends _$ShiftController {
     try {
       await LocationService.stop();
       await _repo.endShift(_uid);
-      final summary = await _repo.getShiftSummary(_uid);
+      Map<String, dynamic>? summary;
+      try {
+        summary = await _repo.getShiftSummary(_uid);
+      } catch (_) {
+        // Summary is optional; shift is already ended in the DB.
+      }
       state = const ShiftIdle();
       return summary;
     } catch (e) {

@@ -181,7 +181,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           children: [
             GoogleMap(
               initialCameraPosition: _initialPosition,
-              myLocationEnabled: false,
+              myLocationEnabled: true,
               myLocationButtonEnabled: false,
               zoomControlsEnabled: false,
               mapToolbarEnabled: false,
@@ -189,6 +189,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               onMapCreated: (controller) {
                 _mapController = controller;
                 setState(() => _mapReady = true);
+                _goToMyLocation();
               },
             ),
             MapLoadingPlaceholder(visible: !_mapReady),
@@ -236,14 +237,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         }
       }
 
-      if (target != null && mounted) {
+      if (!mounted) return;
+      if (target != null) {
         _mapController!.animateCamera(
           CameraUpdate.newCameraPosition(
             CameraPosition(target: target, zoom: 16),
           ),
         );
+      } else {
+        showToast(
+          context,
+          RToastData(
+            message: 'No se pudo obtener tu ubicación',
+            type: RToastType.error,
+          ),
+        );
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        showToast(
+          context,
+          RToastData(
+            message: 'No se pudo obtener tu ubicación',
+            type: RToastType.error,
+          ),
+        );
+      }
+    }
   }
 
   void _triggerSOS() {
