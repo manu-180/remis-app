@@ -1,18 +1,16 @@
+import { requireRole } from '@/lib/auth/require-role';
 import { PageHeader } from '@/components/admin/page-header';
-import { Card, CardContent } from '@/components/ui/card';
+import { AuditClient } from '@/components/admin/audit/audit-client';
 
-export default function AdminAuditPage() {
+export default async function AdminAuditPage() {
+  await requireRole(['admin']);
   return (
     <div className="space-y-6 p-6 lg:p-8">
       <PageHeader
         title="Audit Log"
-        description="Registro inmutable de todas las acciones realizadas en el sistema."
+        description="Registro de todas las acciones administrativas."
       />
-      <Card>
-        <CardContent className="py-12 text-center text-sm text-[var(--neutral-500)]">
-          En construcción
-        </CardContent>
-      </Card>
+      <AuditClient />
     </div>
   );
 }
