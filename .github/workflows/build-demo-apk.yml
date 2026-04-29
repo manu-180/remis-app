@@ -73,12 +73,8 @@ jobs:
           KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
         run: |
           APP="${{ inputs.app }}"
-          python3 -c "
-import base64, os, sys
-raw = os.environ['KEYSTORE_BASE64'].strip()
-raw = ''.join(raw.split())
-sys.stdout.buffer.write(base64.b64decode(raw))
-" > "apps/$APP/android/app/upload-keystore.jks"
+          python3 -c "import base64,os,sys; sys.stdout.buffer.write(base64.b64decode(''.join(os.environ['KEYSTORE_BASE64'].split())))" \
+            > "apps/$APP/android/app/upload-keystore.jks"
           printf 'storeFile=upload-keystore.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
             "$KEYSTORE_STORE_PASSWORD" \
             "$KEYSTORE_KEY_ALIAS" \
