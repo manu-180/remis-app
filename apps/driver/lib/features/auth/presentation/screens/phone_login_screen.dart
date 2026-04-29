@@ -33,8 +33,6 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
     super.dispose();
   }
 
-  // User types 10 digits (area + number). We prepend +549.
-  // E.g. "2954123456" → "+5492954123456" ✓
   String get _fullPhone =>
       '+549${_phoneController.text.replaceAll(RegExp(r'\D'), '')}';
 
@@ -75,66 +73,77 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
     return Scaffold(
       backgroundColor: colorScheme.surface,
       body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: RSpacing.s24),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: RSpacing.s24,
+            vertical: RSpacing.s48,
+          ),
+          child: Form(
+            key: _formKey,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: RSpacing.s12),
-                IconButton(
-                  onPressed: () => context.canPop() ? context.pop() : null,
-                  icon: Icon(Icons.arrow_back, color: colorScheme.onSurface),
-                  padding: EdgeInsets.zero,
-                ),
-                const SizedBox(height: RSpacing.s40),
+                const SizedBox(height: RSpacing.s24),
                 Text(
-                  'Hola.',
+                  'Hola, ¿listo para\nmanejar hoy?',
                   style: interTight(
-                    fontSize: RTextSize.xl3,
-                    fontWeight: FontWeight.w700,
+                    fontSize: RTextSize.xl2,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.01 * RTextSize.xl2,
                     color: colorScheme.onSurface,
-                    letterSpacing: -0.02 * RTextSize.xl3,
-                    height: 1.05,
+                    height: 1.1,
                   ),
                 ),
                 const SizedBox(height: RSpacing.s8),
                 Text(
-                  'Ingresá tu teléfono.',
+                  'Ingresá tu número de teléfono para continuar.',
                   style: inter(
-                    fontSize: RTextSize.md,
-                    fontWeight: FontWeight.w400,
+                    fontSize: RTextSize.base,
                     color: colorScheme.onSurfaceVariant,
+                    height: 1.5,
                   ),
                 ),
-                const SizedBox(height: RSpacing.s32),
-                _PremiumPhoneField(
+                const SizedBox(height: RSpacing.s40),
+                Text(
+                  'Número de celular',
+                  style: inter(
+                    fontSize: RTextSize.sm,
+                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: RSpacing.s6),
+                TextFormField(
                   controller: _phoneController,
                   focusNode: _phoneFocus,
                   enabled: !isLoading,
+                  keyboardType: TextInputType.phone,
+                  textInputAction: TextInputAction.done,
+                  inputFormatters: [_PhoneInputFormatter()],
+                  onFieldSubmitted: (_) => _submit(),
+                  style: inter(
+                    fontSize: RTextSize.base,
+                    color: colorScheme.onSurface,
+                  ),
+                  decoration: const InputDecoration(
+                    hintText: '2954 555 123',
+                    prefixText: '+54 9 ',
+                  ),
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'Ingresá tu número.';
+                    if (v == null || v.isEmpty) {
+                      return 'Ingresá tu número.';
+                    }
                     if (!_isValidPhone(v)) {
                       return 'Ingresá los 10 dígitos de tu número.';
                     }
                     return null;
                   },
-                  onSubmitted: (_) => _submit(),
                 ),
-                const SizedBox(height: RSpacing.s12),
-                Text(
-                  'Te vamos a mandar un código por SMS.',
-                  style: inter(
-                    fontSize: RTextSize.sm,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const Spacer(),
+                const SizedBox(height: RSpacing.s32),
                 FilledButton(
                   onPressed: isLoading ? null : _submit,
                   style: FilledButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 56),
+                    minimumSize: const Size(double.infinity, 48),
                     backgroundColor: kBrandPrimary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
@@ -142,7 +151,7 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                     ),
                     textStyle: inter(
                       fontSize: RTextSize.base,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   child: isLoading
@@ -154,143 +163,22 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text('Continuar'),
-                ),
-                const SizedBox(height: RSpacing.s16),
-                Center(
-                  child: TextButton(
-                    onPressed: () {},
-                    child: Text(
-                      '¿Problemas? Llamanos',
-                      style: inter(
-                        fontSize: RTextSize.sm,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
+                      : const Text('Recibir código'),
                 ),
                 const SizedBox(height: RSpacing.s24),
+                Text(
+                  'Te enviaremos un código por SMS para verificar tu número.',
+                  style: inter(
+                    fontSize: RTextSize.xs,
+                    color: colorScheme.onSurfaceVariant,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ─── Premium phone field ────────────────────────────────────────────────────
-
-class _PremiumPhoneField extends StatelessWidget {
-  const _PremiumPhoneField({
-    required this.controller,
-    required this.focusNode,
-    required this.enabled,
-    required this.validator,
-    required this.onSubmitted,
-  });
-
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final bool enabled;
-  final FormFieldValidator<String> validator;
-  final ValueChanged<String> onSubmitted;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return TextFormField(
-      controller: controller,
-      focusNode: focusNode,
-      enabled: enabled,
-      keyboardType: TextInputType.phone,
-      textInputAction: TextInputAction.done,
-      inputFormatters: [_PhoneInputFormatter()],
-      onFieldSubmitted: onSubmitted,
-      validator: validator,
-      style: inter(
-        fontSize: 26,
-        fontWeight: FontWeight.w600,
-        color: colorScheme.onSurface,
-        letterSpacing: 1.5,
-      ),
-      decoration: InputDecoration(
-        hintText: '2954 123456',
-        hintStyle: inter(
-          fontSize: 26,
-          fontWeight: FontWeight.w400,
-          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-          letterSpacing: 1.5,
-        ),
-        // No left padding — handled by the prefix widget
-        contentPadding: const EdgeInsets.fromLTRB(0, 22, 20, 22),
-        filled: true,
-        fillColor: enabled
-            ? colorScheme.surface
-            : colorScheme.onSurface.withValues(alpha: 0.04),
-        prefix: _CountryPrefix(colorScheme: colorScheme),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: colorScheme.outline, width: 1.5),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: kBrandPrimary, width: 2.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: colorScheme.error, width: 1.5),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: colorScheme.error, width: 2.5),
-        ),
-        disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(
-            color: colorScheme.outline.withValues(alpha: 0.4),
-            width: 1,
-          ),
-        ),
-        errorStyle: inter(
-          fontSize: RTextSize.sm,
-          color: colorScheme.error,
-        ),
-      ),
-    );
-  }
-}
-
-class _CountryPrefix extends StatelessWidget {
-  const _CountryPrefix({required this.colorScheme});
-  final ColorScheme colorScheme;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 18, right: 14),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('🇦🇷', style: TextStyle(fontSize: 22)),
-          const SizedBox(width: 10),
-          Text(
-            '+54 9',
-            style: inter(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Container(
-            width: 1.5,
-            height: 30,
-            color: colorScheme.outlineVariant,
-          ),
-          const SizedBox(width: 14),
-        ],
       ),
     );
   }
@@ -307,7 +195,6 @@ class _PhoneInputFormatter extends TextInputFormatter {
     final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
     final limited = digits.length > 10 ? digits.substring(0, 10) : digits;
 
-    // Format as XXXX XXXXXX (4 + 6)
     final buf = StringBuffer();
     for (var i = 0; i < limited.length; i++) {
       if (i == 4) buf.write(' ');

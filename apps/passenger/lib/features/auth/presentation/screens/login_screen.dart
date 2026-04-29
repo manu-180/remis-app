@@ -40,6 +40,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       // Pass raw digits to OTP screen — it reconstructs the full number itself.
       if (mounted) context.push(AppRoutes.otp, extra: digits);
     } catch (e) {
+      debugPrint('[OTP] signInWithOtp error: $e');
       setState(() => _error = 'No pudimos enviar el código. Intentá de nuevo.');
     } finally {
       if (mounted) setState(() => _loading = false);
