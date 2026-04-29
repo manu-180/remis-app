@@ -7,6 +7,7 @@ import 'package:remis_driver/features/chat/presentation/screens/chat_screen.dart
 import 'package:remis_driver/features/home/presentation/screens/home_screen.dart';
 import 'package:remis_driver/features/kyc/presentation/screens/kyc_onboarding_screen.dart';
 import 'package:remis_driver/features/kyc/presentation/screens/intra_shift_verification_screen.dart';
+import 'package:remis_driver/features/history/presentation/screens/history_screen.dart';
 import 'package:remis_driver/features/settings/presentation/screens/settings_screen.dart';
 
 final appRouter = GoRouter(
@@ -44,6 +45,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/settings',
       builder: (_, __) => const SettingsScreen(),
+    ),
+    GoRoute(
+      path: '/history',
+      builder: (_, __) => const HistoryScreen(),
     ),
     GoRoute(
       path: '/chat/:rideId/:passengerId',

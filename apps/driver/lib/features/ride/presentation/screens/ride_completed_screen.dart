@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:remis_design_system/remis_design_system.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:remis_driver/features/ride/data/ride_model.dart';
 import 'package:remis_driver/shared/widgets/r_premium_action_button.dart';
 
-class RideCompletedScreen extends StatelessWidget {
+class RideCompletedScreen extends ConsumerStatefulWidget {
   const RideCompletedScreen({
     super.key,
     required this.ride,
@@ -15,14 +17,62 @@ class RideCompletedScreen extends StatelessWidget {
   final VoidCallback onDone;
 
   @override
+  ConsumerState<RideCompletedScreen> createState() =>
+      _RideCompletedScreenState();
+}
+
+class _RideCompletedScreenState extends ConsumerState<RideCompletedScreen> {
+  int _selectedStars = 0;
+  bool _ratingSubmitted = false;
+  bool _submitting = false;
+  bool _alreadyRated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkExistingRating();
+  }
+
+  Future<void> _checkExistingRating() async {
+    try {
+      final result = await Supabase.instance.client
+          .from('ride_ratings')
+          .select('id')
+          .eq('ride_id', widget.ride.id)
+          .maybeSingle();
+      if (result != null && mounted) {
+        setState(() => _alreadyRated = true);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _submitRating() async {
+    if (_selectedStars == 0 || _submitting) return;
+    setState(() => _submitting = true);
+    try {
+      final client = Supabase.instance.client;
+      final uid = client.auth.currentUser!.id;
+      await client.from('ride_ratings').insert({
+        'ride_id': widget.ride.id,
+        'passenger_id': widget.ride.passengerId,
+        'driver_id': uid,
+        'stars': _selectedStars,
+      });
+      if (mounted) setState(() => _ratingSubmitted = true);
+    } catch (_) {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final double distanceKm =
-        (ride.distanceMeters ?? 0) / 1000;
-    final int durationMin = (ride.startedAt != null && ride.endedAt != null)
-        ? ride.endedAt!.difference(ride.startedAt!).inMinutes
-        : 0;
+    final double distanceKm = (widget.ride.distanceMeters ?? 0) / 1000;
+    final int durationMin =
+        (widget.ride.startedAt != null && widget.ride.endedAt != null)
+            ? widget.ride.endedAt!.difference(widget.ride.startedAt!).inMinutes
+            : 0;
     final double fare =
-        ride.finalFareArs ?? ride.estimatedFareArs ?? 0.0;
+        widget.ride.finalFareArs ?? widget.ride.estimatedFareArs ?? 0.0;
 
     return Scaffold(
       appBar: AppBar(
@@ -114,7 +164,7 @@ class RideCompletedScreen extends StatelessWidget {
                     ),
                     _Divider(),
                     _StatCell(
-                      label: '\$',
+                      label: r'$',
                       valueSuffix: true,
                       value: fare,
                       decimals: 2,
@@ -138,7 +188,7 @@ class RideCompletedScreen extends StatelessWidget {
                       icon: Icons.trip_origin,
                       iconColor: kBrandPrimary,
                       label: 'Origen',
-                      address: ride.pickupAddress,
+                      address: widget.ride.pickupAddress,
                     ),
                     Padding(
                       padding: const EdgeInsets.only(
@@ -153,18 +203,35 @@ class RideCompletedScreen extends StatelessWidget {
                       icon: Icons.location_on,
                       iconColor: kDanger,
                       label: 'Destino',
-                      address: ride.destAddress,
+                      address: widget.ride.destAddress,
                     ),
                   ],
                 ),
               ),
+
+              // -- Rating widget --
+              if (!_alreadyRated) ...[
+                const SizedBox(height: RSpacing.s32),
+                _PassengerRating(
+                  selectedStars: _selectedStars,
+                  submitted: _ratingSubmitted,
+                  submitting: _submitting,
+                  onStarTap: (stars) {
+                    if (!_ratingSubmitted) {
+                      setState(() => _selectedStars = stars);
+                    }
+                  },
+                  onSubmit: _submitRating,
+                ),
+              ],
+
               const SizedBox(height: RSpacing.s32),
               SizedBox(
                 width: double.infinity,
                 child: RPremiumActionButton(
                   label: 'Volver al inicio',
                   icon: Icons.home_outlined,
-                  onPressed: onDone,
+                  onPressed: widget.onDone,
                 ),
               ),
             ],
@@ -174,6 +241,90 @@ class RideCompletedScreen extends StatelessWidget {
     );
   }
 }
+
+// -- Passenger rating --------------------------------------------------------
+
+class _PassengerRating extends StatelessWidget {
+  const _PassengerRating({
+    required this.selectedStars,
+    required this.submitted,
+    required this.submitting,
+    required this.onStarTap,
+    required this.onSubmit,
+  });
+
+  final int selectedStars;
+  final bool submitted;
+  final bool submitting;
+  final ValueChanged<int> onStarTap;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(RSpacing.s20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F7F7),
+        borderRadius: BorderRadius.circular(RRadius.lg),
+      ),
+      child: Column(
+        children: [
+          Text(
+            submitted ? '¡Gracias!' : '¿Cómo fue el pasajero?',
+            style: interTight(
+              fontSize: RTextSize.base,
+              fontWeight: FontWeight.w600,
+              color: kNeutral900Light,
+            ),
+          ),
+          const SizedBox(height: RSpacing.s12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(5, (i) {
+              final star = i + 1;
+              return GestureDetector(
+                onTap: () => onStarTap(star),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Icon(
+                    star <= selectedStars ? Icons.star_rounded : Icons.star_outline_rounded,
+                    size: 40,
+                    color: star <= selectedStars ? kBrandAccent : kNeutral300Light,
+                  ),
+                ),
+              );
+            }),
+          ),
+          if (selectedStars > 0 && !submitted) ...[
+            const SizedBox(height: RSpacing.s16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: submitting ? null : onSubmit,
+                child: submitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Enviar calificación'),
+              ),
+            ),
+          ],
+        ],
+      ),
+    )
+        .animate()
+        .fadeIn(duration: 400.ms, delay: 500.ms)
+        .slideY(begin: 0.1, end: 0, duration: 400.ms, delay: 500.ms);
+  }
+}
+
+// -- Existing helpers (unchanged) -------------------------------------------
 
 class _Divider extends StatelessWidget {
   @override

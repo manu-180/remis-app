@@ -9,11 +9,14 @@ import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:remis_design_system/remis_design_system.dart';
 import 'package:remis_flutter_core/remis_flutter_core.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:remis_driver/core/providers/auth_providers.dart';
 import 'package:remis_driver/features/ride/data/ride_model.dart';
 import 'package:remis_driver/features/ride/presentation/providers/ride_controller.dart';
 import 'package:remis_driver/features/ride/presentation/screens/ride_completed_screen.dart';
 import 'package:remis_driver/features/ride/presentation/screens/ride_in_progress_screen.dart';
 import 'package:remis_driver/features/ride/presentation/widgets/ride_offer_modal.dart';
+import 'package:remis_driver/features/shift/data/location_service.dart';
 import 'package:remis_driver/features/shift/presentation/providers/shift_controller.dart';
 import 'package:remis_driver/shared/audio_service.dart';
 import 'package:remis_driver/shared/widgets/driver_status_pill.dart';
@@ -37,6 +40,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Timer? _batteryTimer;
   bool _offerModalOpen = false;
   bool _mapReady = false;
+  GoogleMapController? _mapController;
 
   @override
   void initState() {
@@ -152,6 +156,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Home / idle screen
     final isActive = shiftState is ShiftActive;
     final theme = Theme.of(context);
+    final user = ref.watch(currentUserProvider);
+    final displayName =
+        user?.userMetadata?['full_name'] as String? ?? 'Conductor';
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -167,6 +174,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           shiftState: shiftState,
           batteryLevel: _batteryLevel,
           onSOS: _triggerSOS,
+          displayName: displayName,
+          onAvatarTap: () => context.push('/settings'),
         ),
         body: Stack(
           children: [
@@ -177,7 +186,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               zoomControlsEnabled: false,
               mapToolbarEnabled: false,
               compassEnabled: false,
-              onMapCreated: (_) => setState(() => _mapReady = true),
+              onMapCreated: (controller) {
+                _mapController = controller;
+                setState(() => _mapReady = true);
+              },
             ),
             MapLoadingPlaceholder(visible: !_mapReady),
             if (!isActive) _EmptyStateOverlay(),
@@ -195,7 +207,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         floatingActionButton: Padding(
           padding: const EdgeInsets.only(bottom: 140),
           child: FloatingActionButton.small(
-            onPressed: () {},
+            onPressed: _goToMyLocation,
             backgroundColor: theme.colorScheme.surface,
             foregroundColor: theme.colorScheme.onSurface,
             elevation: 2,
@@ -205,6 +217,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       ),
     );
+  }
+
+  Future<void> _goToMyLocation() async {
+    if (_mapController == null) return;
+    try {
+      final loc = await LocationService.getCurrentLocation();
+      if (loc != null && mounted) {
+        _mapController!.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: LatLng(loc.coords.latitude, loc.coords.longitude),
+              zoom: 16,
+            ),
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   void _triggerSOS() {
@@ -217,16 +246,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
 // ─── AppBar ─────────────────────────────────────────────────────────────────
 
+String _initials(String name) {
+  final parts = name.trim().split(RegExp(r'\s+'));
+  if (parts.length >= 2) {
+    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  }
+  return name.isNotEmpty ? name[0].toUpperCase() : '?';
+}
+
 class _TranslucentAppBar extends StatelessWidget implements PreferredSizeWidget {
   const _TranslucentAppBar({
     required this.shiftState,
     required this.batteryLevel,
     required this.onSOS,
+    required this.displayName,
+    required this.onAvatarTap,
   });
 
   final ShiftState shiftState;
   final int batteryLevel;
   final VoidCallback onSOS;
+  final String displayName;
+  final VoidCallback onAvatarTap;
 
   @override
   Size get preferredSize => const Size.fromHeight(56);
@@ -245,17 +286,45 @@ class _TranslucentAppBar extends StatelessWidget implements PreferredSizeWidget 
         child: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => context.push('/settings'),
-          ),
-          title: Text(
-            isActive ? 'Turno activo' : 'Turno inactivo',
-            style: interTight(
-              fontSize: RTextSize.md,
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurface,
+          leading: Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: GestureDetector(
+              onTap: onAvatarTap,
+              child: Center(
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: kBrandPrimary.withValues(alpha: 0.12),
+                  child: Text(
+                    _initials(displayName),
+                    style: interTight(
+                      fontSize: RTextSize.xs,
+                      fontWeight: FontWeight.w700,
+                      color: kBrandPrimary,
+                    ),
+                  ),
+                ),
+              ),
             ),
+          ),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Hola, ${displayName.split(' ').first}',
+                style: interTight(
+                  fontSize: RTextSize.sm,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              Text(
+                isActive ? 'Turno activo' : 'Turno inactivo',
+                style: inter(
+                  fontSize: RTextSize.xs,
+                  color: isActive ? kSuccess : theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
           actions: [
             if (batteryLevel < 20)
@@ -532,19 +601,50 @@ class _SOSDialogState extends State<_SOSDialog>
     );
   }
 
-  void _completeSOS() {
+  Future<void> _completeSOS() async {
     if (_triggered) return;
     _triggered = true;
     _hapticTimer?.cancel();
     DriverAudio.play(SoundEffect.sosTriggered);
     Navigator.pop(context);
-    // TODO: trigger SOS edge function (Tanda 5)
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('SOS enviado'),
-        backgroundColor: kDanger,
-      ),
-    );
+
+    try {
+      final client = Supabase.instance.client;
+      final uid = client.auth.currentUser!.id;
+
+      String? locationWkt;
+      try {
+        final loc = await LocationService.getCurrentLocation();
+        if (loc != null) {
+          locationWkt =
+              'SRID=4326;POINT(${loc.coords.longitude} ${loc.coords.latitude})';
+        }
+      } catch (_) {}
+
+      await client.from('sos_events').insert({
+        'triggered_by': uid,
+        'triggered_role': 'driver',
+        if (locationWkt != null) 'location': locationWkt,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('SOS enviado. La central fue notificada.'),
+            backgroundColor: kDanger,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error enviando SOS: $e'),
+            backgroundColor: kDanger,
+          ),
+        );
+      }
+    }
   }
 
   @override
