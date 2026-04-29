@@ -71,7 +71,13 @@ class LocationService {
     _ready = true;
   }
 
-  static Future<void> start() => bg.BackgroundGeolocation.start();
+  static Future<void> start() async {
+    final state = await bg.BackgroundGeolocation.state;
+    if (!state.enabled) {
+      await bg.BackgroundGeolocation.start();
+    }
+  }
+
   static Future<void> stop() => bg.BackgroundGeolocation.stop();
 
   static Future<bg.Location?> getCurrentLocation() async {
