@@ -46,7 +46,7 @@ dev_dependencies:
   freezed: ^2.5.7
   json_serializable: ^6.9.0
   flutter_lints: ^5.0.0
-  mocktail: ^0.3.0
+  mocktail: ^1.0.5
   # custom_lint + riverpod_lint: incompatible with Dart 3.10.x / analyzer 7.6 — re-add when upstream fixes
   # custom_lint: ^0.7.0
   # riverpod_lint: ^2.6.0
