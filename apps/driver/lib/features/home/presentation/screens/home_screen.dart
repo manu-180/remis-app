@@ -780,6 +780,7 @@ class _SOSDialogState extends State<_SOSDialog>
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
       child: Container(
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: const Color(0xFF0D0D0D),
           borderRadius: BorderRadius.circular(24),
@@ -802,9 +803,6 @@ class _SOSDialogState extends State<_SOSDialog>
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Color(0xFF7A0000), kDanger, Color(0xFFFF6060)],
-                ),
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(24),
                 ),
               ),
             ),
