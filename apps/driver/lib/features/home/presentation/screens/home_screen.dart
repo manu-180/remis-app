@@ -359,11 +359,43 @@ class _TranslucentAppBar extends StatelessWidget implements PreferredSizeWidget 
           actions: [
             if (batteryLevel < 20)
               _BatteryWarning(level: batteryLevel),
-            IconButton(
-              onPressed: onSOS,
-              icon: const Icon(Icons.warning_amber_rounded),
-              color: kDanger,
-              tooltip: 'SOS',
+            Padding(
+              padding: const EdgeInsets.only(right: RSpacing.s8),
+              child: GestureDetector(
+                onTap: onSOS,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: RSpacing.s10,
+                    vertical: RSpacing.s6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: kDanger,
+                    borderRadius: BorderRadius.circular(RRadius.full),
+                    boxShadow: [
+                      BoxShadow(
+                        color: kDanger.withValues(alpha: 0.45),
+                        blurRadius: 10,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.shield, color: Colors.white, size: 13),
+                      const SizedBox(width: RSpacing.s4),
+                      Text(
+                        'SOS',
+                        style: interTight(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.5,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -590,45 +622,88 @@ class _SOSDialog extends StatefulWidget {
 }
 
 class _SOSDialogState extends State<_SOSDialog>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _ring;
+  late AnimationController _pulse1;
+  late AnimationController _pulse2;
+  late AnimationController _pulse3;
   Timer? _hapticTimer;
   bool _triggered = false;
+  bool _isHolding = false;
 
+  final List<DateTime> _tapTimestamps = [];
+  static const _requiredTaps = 5;
+  static const _tapWindow = Duration(milliseconds: 1500);
   static const _holdDuration = Duration(milliseconds: 2500);
 
   @override
   void initState() {
     super.initState();
     _ring = AnimationController(vsync: this, duration: _holdDuration);
+    _ring.addStatusListener((status) {
+      if (status == AnimationStatus.completed) _completeSOS();
+    });
+    _pulse1 = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
+    _pulse2 = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    _pulse3 = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    Future.delayed(const Duration(milliseconds: 667), () {
+      if (mounted) _pulse2.repeat();
+    });
+    Future.delayed(const Duration(milliseconds: 1333), () {
+      if (mounted) _pulse3.repeat();
+    });
   }
 
   @override
   void dispose() {
     _ring.dispose();
+    _pulse1.dispose();
+    _pulse2.dispose();
+    _pulse3.dispose();
     _hapticTimer?.cancel();
     super.dispose();
   }
 
   void _onHoldStart(LongPressStartDetails _) {
+    if (_triggered) return;
+    setState(() => _isHolding = true);
     _ring.forward();
     _hapticTimer = Timer.periodic(
       const Duration(milliseconds: 500),
       (_) => HapticFeedback.heavyImpact(),
     );
-    _ring.addStatusListener((status) {
-      if (status == AnimationStatus.completed) _completeSOS();
-    });
   }
 
   void _onHoldEnd(LongPressEndDetails _) {
     if (_triggered) return;
+    setState(() => _isHolding = false);
     _ring.reset();
     _hapticTimer?.cancel();
     HapticFeedback.lightImpact();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('SOS cancelado')),
     );
+  }
+
+  void _onTap() {
+    if (_triggered) return;
+    HapticFeedback.mediumImpact();
+    final now = DateTime.now();
+    _tapTimestamps.removeWhere((t) => now.difference(t) > _tapWindow);
+    _tapTimestamps.add(now);
+    setState(() {});
+    if (_tapTimestamps.length >= _requiredTaps) {
+      _completeSOS();
+    }
   }
 
   Future<void> _completeSOS() async {
@@ -677,80 +752,279 @@ class _SOSDialogState extends State<_SOSDialog>
     }
   }
 
+  Widget _buildPulseRing(AnimationController controller) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (_, __) {
+        final t = controller.value;
+        final size = 112.0 + (80.0 * t);
+        final opacity = (1.0 - t) * 0.30;
+        return Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: kDanger.withValues(alpha: opacity),
+              width: 1.5,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(
-        'SOS de emergencia',
-        style: interTight(
-          fontSize: RTextSize.lg,
-          fontWeight: FontWeight.w700,
-          color: kDanger,
-        ),
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Mantené presionado el botón para enviar una alerta de emergencia.',
-            style: inter(fontSize: RTextSize.sm),
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D0D0D),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: kDanger.withValues(alpha: 0.22),
           ),
-          const SizedBox(height: RSpacing.s24),
-          AnimatedBuilder(
-            animation: _ring,
-            builder: (_, __) {
-              final remaining =
-                  ((_holdDuration.inSeconds) * (1 - _ring.value)).ceil();
-              return GestureDetector(
-                onLongPressStart: _onHoldStart,
-                onLongPressEnd: _onHoldEnd,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    SizedBox(
-                      width: 100,
-                      height: 100,
-                      child: CircularProgressIndicator(
-                        value: _ring.value,
-                        strokeWidth: 6,
-                        backgroundColor: kDanger.withValues(alpha: 0.2),
-                        valueColor:
-                            const AlwaysStoppedAnimation<Color>(kDanger),
-                      ),
-                    ),
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: kDanger,
-                        shape: BoxShape.circle,
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        _ring.value > 0 ? '$remaining' : 'SOS',
-                        style: interTight(
-                          fontSize: RTextSize.xl,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: kDanger.withValues(alpha: 0.15),
+              blurRadius: 48,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Gradient accent strip at top
+            Container(
+              height: 3,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF7A0000), kDanger, Color(0xFFFF6060)],
+                ),
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+              child: Column(
+                children: [
+                  // Header row
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: kDanger.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: kDanger.withValues(alpha: 0.20),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.shield_outlined,
+                          color: kDanger,
+                          size: 15,
                         ),
                       ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'EMERGENCIA',
+                        style: interTight(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 2.0,
+                          color: kDanger,
+                        ),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1C1C1C),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFF2A2A2A),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            color: Color(0xFF888888),
+                            size: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Container(height: 1, color: const Color(0xFF1C1C1C)),
+                  const SizedBox(height: 28),
+
+                  // SOS button with pulsing rings
+                  AnimatedBuilder(
+                    animation: _ring,
+                    builder: (context, _) {
+                      final remaining =
+                          (_holdDuration.inSeconds * (1 - _ring.value))
+                              .ceil();
+                      return GestureDetector(
+                        onLongPressStart: _onHoldStart,
+                        onLongPressEnd: _onHoldEnd,
+                        onTap: _onTap,
+                        child: SizedBox(
+                          width: 200,
+                          height: 200,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              _buildPulseRing(_pulse1),
+                              _buildPulseRing(_pulse2),
+                              _buildPulseRing(_pulse3),
+                              // Hold progress ring
+                              SizedBox(
+                                width: 130,
+                                height: 130,
+                                child: CircularProgressIndicator(
+                                  value: _ring.value,
+                                  strokeWidth: 3,
+                                  backgroundColor:
+                                      Colors.white.withValues(alpha: 0.07),
+                                  valueColor:
+                                      const AlwaysStoppedAnimation<Color>(
+                                          kDanger),
+                                  strokeCap: StrokeCap.round,
+                                ),
+                              ),
+                              // Main circle
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                width: 114,
+                                height: 114,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: RadialGradient(
+                                    center: const Alignment(-0.3, -0.5),
+                                    radius: 1.1,
+                                    colors: _isHolding
+                                        ? [
+                                            const Color(0xFFFF3333),
+                                            const Color(0xFFAA0000),
+                                          ]
+                                        : [
+                                            const Color(0xFFDD2222),
+                                            const Color(0xFF800000),
+                                          ],
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: kDanger.withValues(
+                                          alpha: _isHolding ? 0.65 : 0.35),
+                                      blurRadius: _isHolding ? 36 : 20,
+                                      spreadRadius: _isHolding ? 6 : 0,
+                                    ),
+                                  ],
+                                  border: Border.all(
+                                    color:
+                                        Colors.white.withValues(alpha: 0.15),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                alignment: Alignment.center,
+                                child: _ring.value > 0
+                                    ? Text(
+                                        '$remaining',
+                                        style: interTight(
+                                          fontSize: RTextSize.xl2,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            'SOS',
+                                            style: interTight(
+                                              fontSize: 30,
+                                              fontWeight: FontWeight.w900,
+                                              color: Colors.white,
+                                              letterSpacing: 4,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Container(
+                                            width: 28,
+                                            height: 2,
+                                            decoration: BoxDecoration(
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.30),
+                                              borderRadius:
+                                                  BorderRadius.circular(1),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Tap progress dots
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(_requiredTaps, (i) {
+                      final filled = i < _tapTimestamps.length;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 120),
+                        width: filled ? 10 : 6,
+                        height: filled ? 10 : 6,
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: filled
+                              ? kDanger
+                              : Colors.white.withValues(alpha: 0.12),
+                          boxShadow: filled
+                              ? [
+                                  BoxShadow(
+                                    color: kDanger.withValues(alpha: 0.5),
+                                    blurRadius: 6,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+
+                  Text(
+                    'Toca 5 veces rápido  ·  o mantené presionado',
+                    style: inter(
+                      fontSize: RTextSize.xs,
+                      color: const Color(0xFF555555),
+                      letterSpacing: 0.2,
                     ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(
-            'Cancelar',
-            style: inter(fontSize: RTextSize.sm),
-          ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

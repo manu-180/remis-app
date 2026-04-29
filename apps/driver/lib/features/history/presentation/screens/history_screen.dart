@@ -87,7 +87,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   }
 
   Future<void> _refresh() async {
-    HapticFeedback.lightImpact();
+    await HapticFeedback.lightImpact();
     setState(() {
       _rides.clear();
       _page = 0;

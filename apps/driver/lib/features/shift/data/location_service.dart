@@ -52,7 +52,7 @@ class LocationService {
         "heading": <%= heading %>,
         "speed_mps": <%= speed %>,
         "accuracy_m": <%= accuracy %>,
-        "battery_pct": <%= battery.level == -1 ? 0 : (battery.level * 100).round() %>,
+        "battery_pct": <%= battery.level < 0 ? 0 : Math.round(battery.level * 100) %>,
         "status": "available",
         "updated_at": "<%= timestamp %>"
       }
