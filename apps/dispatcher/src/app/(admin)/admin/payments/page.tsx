@@ -1,18 +1,13 @@
+import { requireRole } from '@/lib/auth/require-role';
 import { PageHeader } from '@/components/admin/page-header';
-import { Card, CardContent } from '@/components/ui/card';
+import { PaymentsClient } from '@/components/admin/payments/payments-client';
 
-export default function AdminPaymentsPage() {
+export default async function AdminPaymentsPage() {
+  await requireRole(['admin']);
   return (
     <div className="space-y-6 p-6 lg:p-8">
-      <PageHeader
-        title="Pagos"
-        description="Transacciones, estados de cobro y conciliación de ingresos."
-      />
-      <Card>
-        <CardContent className="py-12 text-center text-sm text-[var(--neutral-500)]">
-          En construcción
-        </CardContent>
-      </Card>
+      <PageHeader title="Pagos" />
+      <PaymentsClient />
     </div>
   );
 }
