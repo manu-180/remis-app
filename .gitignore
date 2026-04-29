@@ -101,6 +101,7 @@ lerna-debug.log*
 # ───────── Session state local (no commitear) ─────────
 .remember/
 .claude/
+.superpowers/
 CLAUDE.local.md
 
 # ───────── Git worktrees ─────────

@@ -217,12 +217,6 @@ class _RideInProgressScreenState extends State<RideInProgressScreen>
                 decoration: BoxDecoration(
                   color: kDanger,
                   borderRadius: BorderRadius.circular(RRadius.full),
-                  boxShadow: [
-                    BoxShadow(
-                      color: kDanger.withValues(alpha: 0.45),
-                      blurRadius: 10,
-                    ),
-                  ],
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
