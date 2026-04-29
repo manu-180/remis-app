@@ -39,6 +39,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   DestinationResult? _destination;
   RouteResult? _route;
   double? _fareArs;
+  bool _confirmingDestination = false;
 
   static const _defaultCenter = LatLng(-36.6167, -64.2833); // Santa Rosa, La Pampa
 
@@ -232,12 +233,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  void _confirmDestination() {
+  Future<void> _confirmDestination() async {
     final pickup = _pickupLocation;
     final dest = _destination;
     if (pickup == null || dest == null) return;
 
-    showModalBottomSheet<void>(
+    setState(() => _confirmingDestination = true);
+
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -252,6 +255,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         },
       ),
     );
+
+    if (mounted) {
+      setState(() => _confirmingDestination = false);
+    }
   }
 
   @override
@@ -405,6 +412,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   _pickupLocation != null ? _openDestinationSearch : () {},
               onClearDestination: _clearDestination,
               onConfirm: _confirmDestination,
+              confirmLoading: _confirmingDestination,
             ),
           ),
         ],

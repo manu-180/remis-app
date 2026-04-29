@@ -16,6 +16,7 @@ class RoutePanel extends StatelessWidget {
     required this.onSearchTap,
     required this.onClearDestination,
     required this.onConfirm,
+    this.confirmLoading = false,
   });
 
   final String pickupAddress;       // e.g. "Mi ubicación" or street
@@ -24,6 +25,7 @@ class RoutePanel extends StatelessWidget {
   final VoidCallback onSearchTap;
   final VoidCallback onClearDestination;
   final VoidCallback onConfirm;
+  final bool confirmLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -194,6 +196,7 @@ class RoutePanel extends StatelessWidget {
         // Confirm CTA
         SizedBox(
           width: double.infinity,
+          height: 52,
           child: FilledButton(
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
@@ -201,10 +204,26 @@ class RoutePanel extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
               ),
             ),
-            onPressed: onConfirm,
-            child: const Text(
-              'Confirmar destino',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+            onPressed: confirmLoading ? null : onConfirm,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: confirmLoading
+                  ? const SizedBox(
+                      key: ValueKey('spinner'),
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text(
+                      key: ValueKey('label'),
+                      'Confirmar destino',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 15),
+                    ),
             ),
           ),
         ),
