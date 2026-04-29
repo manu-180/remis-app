@@ -222,14 +222,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _goToMyLocation() async {
     if (_mapController == null) return;
     try {
-      final loc = await LocationService.getCurrentLocation();
-      if (loc != null && mounted) {
+      LatLng? target;
+
+      // When shift is active, BackgroundGeolocation has a recent position.
+      final bgLoc = await LocationService.getCurrentLocation();
+      if (bgLoc != null) {
+        target = LatLng(bgLoc.coords.latitude, bgLoc.coords.longitude);
+      } else {
+        // Fallback: use geolocator directly (works before shift starts).
+        final pos = await getCurrentPositionOrNull();
+        if (pos != null) {
+          target = LatLng(pos.latitude, pos.longitude);
+        }
+      }
+
+      if (target != null && mounted) {
         _mapController!.animateCamera(
           CameraUpdate.newCameraPosition(
-            CameraPosition(
-              target: LatLng(loc.coords.latitude, loc.coords.longitude),
-              zoom: 16,
-            ),
+            CameraPosition(target: target, zoom: 16),
           ),
         );
       }
