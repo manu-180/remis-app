@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:remis_design_system/remis_design_system.dart';
 import 'package:remis_flutter_core/remis_flutter_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -44,7 +45,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     if (!mounted) return;
 
     final isAuth = ref.read(isAuthenticatedProvider);
-    context.go(isAuth ? '/home' : '/auth/login');
+    if (!isAuth) {
+      context.go('/auth/login');
+    } else {
+      final prefs = await SharedPreferences.getInstance();
+      final onboardingDone = prefs.getBool('onboarding_completed') ?? false;
+      context.go(onboardingDone ? '/home' : '/kyc/onboarding');
+    }
   }
 
   @override
