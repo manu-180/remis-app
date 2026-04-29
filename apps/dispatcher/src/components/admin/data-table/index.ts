@@ -9,3 +9,5 @@ export {
   createAvatarColumn,
   createActionsColumn,
 } from './column-helpers';
+export { FilterBar } from './filter-bar';
+export type { FilterBarProps, FilterConfig } from './filter-bar';
