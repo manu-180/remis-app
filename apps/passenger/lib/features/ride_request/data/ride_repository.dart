@@ -76,14 +76,12 @@ class RideRepository {
     return RideModel.fromMap(result);
   }
 
-  Future<RideModel> cancelRide(String rideId, String reason) async {
-    final result = await _client.rpc('cancel_ride', params: {
+  Future<void> cancelRide(String rideId, String reason) async {
+    await _client.rpc('cancel_ride', params: {
       'p_ride_id': rideId,
       'p_actor_id': _userId,
       'p_reason': reason,
     });
-    if (result == null) throw Exception('cancel_ride returned null');
-    return RideModel.fromMap(result as Map<String, dynamic>);
   }
 
   Stream<RideModel> watchRide(String rideId) {
