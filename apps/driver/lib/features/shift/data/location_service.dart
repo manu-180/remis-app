@@ -71,7 +71,14 @@ class LocationService {
     _ready = true;
   }
 
-  static Future<void> start() => bg.BackgroundGeolocation.start();
+  static Future<void> start() async {
+    // Explicitly request location permission before starting the foreground
+    // service. On Android 14+ (targetSdk 34+) calling startForeground() with
+    // type=location without ACCESS_FINE_LOCATION granted throws a fatal
+    // ForegroundServiceTypeNotAllowedException that kills the process.
+    await bg.BackgroundGeolocation.requestPermission();
+    await bg.BackgroundGeolocation.start();
+  }
   static Future<void> stop() => bg.BackgroundGeolocation.stop();
 
   static Future<bg.Location?> getCurrentLocation() async {

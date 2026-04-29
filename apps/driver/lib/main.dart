@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_background_geolocation/flutter_background_geolocation.dart' as bg;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:remis_flutter_core/remis_flutter_core.dart';
 import 'package:remis_driver/app.dart';
 
+@pragma('vm:entry-point')
+void _bgHeadlessTask(bg.HeadlessEvent event) async {
+  // Location events in headless mode (app terminated) — plugin auto-syncs via url config
+}
+
 void main() async {
+  // Must be called before WidgetsFlutterBinding.ensureInitialized()
+  bg.BackgroundGeolocation.registerHeadlessTask(_bgHeadlessTask);
   WidgetsFlutterBinding.ensureInitialized();
 
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
