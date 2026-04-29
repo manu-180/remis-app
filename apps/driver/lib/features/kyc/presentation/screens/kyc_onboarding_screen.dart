@@ -1,48 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:remis_design_system/remis_design_system.dart';
 import 'package:remis_driver/features/kyc/presentation/providers/kyc_controller.dart';
 
-class KycOnboardingScreen extends ConsumerStatefulWidget {
+class KycOnboardingScreen extends ConsumerWidget {
   const KycOnboardingScreen({super.key});
 
   @override
-  ConsumerState<KycOnboardingScreen> createState() => _KycOnboardingScreenState();
-}
-
-class _KycOnboardingScreenState extends ConsumerState<KycOnboardingScreen> {
-  bool _urlOpened = false;
-
-  Future<void> _openUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (mounted) {
-        setState(() => _urlOpened = true);
-      }
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('No se pudo abrir el enlace de verificación.'),
-            backgroundColor: kDanger,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final kycState = ref.watch(kycControllerProvider);
 
     ref.listen(kycControllerProvider, (_, next) {
-      if (next is KycSessionCreated) {
-        _openUrl(next.sessionUrl);
-      } else if (next is KycFailure) {
+      if (next is KycFailure) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(next.message),
@@ -57,7 +27,7 @@ class _KycOnboardingScreenState extends ConsumerState<KycOnboardingScreen> {
     });
 
     final isLoading = kycState is KycLoading;
-    final sessionCreated = kycState is KycSessionCreated;
+    final isPending = kycState is KycPending;
 
     return Scaffold(
       body: SafeArea(
@@ -100,7 +70,7 @@ class _KycOnboardingScreenState extends ConsumerState<KycOnboardingScreen> {
               const SizedBox(height: RSpacing.s12),
               Text(
                 'Para operar como conductor necesitamos verificar tu identidad. '
-                'El proceso es rápido: vas a necesitar tu DNI y una selfie.',
+                'Un administrador revisará tu solicitud y te habilitará.',
                 style: inter(
                   fontSize: RTextSize.md,
                   fontWeight: FontWeight.w400,
@@ -111,49 +81,44 @@ class _KycOnboardingScreenState extends ConsumerState<KycOnboardingScreen> {
               const SizedBox(height: RSpacing.s32),
               _StepItem(
                 number: '1',
-                label: 'Fotográfiá el frente de tu DNI',
+                label: 'Solicitá la verificación con el botón de abajo',
               ),
               const SizedBox(height: RSpacing.s16),
               _StepItem(
                 number: '2',
-                label: 'Fotográfiá el dorso de tu DNI',
+                label: 'Un administrador revisará tu solicitud',
               ),
               const SizedBox(height: RSpacing.s16),
               _StepItem(
                 number: '3',
-                label: 'Tomá una selfie mirando a la cámara',
+                label: 'Una vez aprobado, podés empezar a trabajar',
               ),
-              if (_urlOpened || sessionCreated) ...[
+              if (isPending) ...[
                 const SizedBox(height: RSpacing.s32),
                 Container(
                   padding: const EdgeInsets.all(RSpacing.s16),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color: kBrandPrimary.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(RRadius.md),
+                    border: Border.all(
+                      color: kBrandPrimary.withOpacity(0.2),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      if (isLoading)
-                        const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      else
-                        Icon(
-                          Icons.info_outline,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          size: 20,
-                        ),
+                      const Icon(
+                        Icons.check_circle_outline,
+                        color: kBrandPrimary,
+                        size: 20,
+                      ),
                       const SizedBox(width: RSpacing.s12),
                       Expanded(
                         child: Text(
-                          isLoading
-                              ? 'Verificando tu identidad...'
-                              : 'Completá la verificación en el navegador y luego volvé aquí.',
+                          'Solicitud enviada. Un administrador la revisará pronto.',
                           style: inter(
                             fontSize: RTextSize.sm,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: kBrandPrimary,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
@@ -162,7 +127,7 @@ class _KycOnboardingScreenState extends ConsumerState<KycOnboardingScreen> {
                 ),
               ],
               const Spacer(),
-              if (!_urlOpened && !sessionCreated)
+              if (!isPending)
                 FilledButton(
                   onPressed: isLoading
                       ? null
@@ -188,7 +153,7 @@ class _KycOnboardingScreenState extends ConsumerState<KycOnboardingScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text('Comenzar verificación'),
+                      : const Text('Enviar solicitud de verificación'),
                 )
               else ...[
                 FilledButton(
@@ -216,33 +181,8 @@ class _KycOnboardingScreenState extends ConsumerState<KycOnboardingScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text('Ya completé la verificación'),
+                      : const Text('Ya fui aprobado'),
                 ),
-                const SizedBox(height: RSpacing.s8),
-                Center(
-                  child: Text(
-                    '⚡ Modo demo — verificación simulada',
-                    style: inter(
-                      fontSize: RTextSize.xs,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.6),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: RSpacing.s12),
-                if (sessionCreated)
-                  SizedBox(
-                    width: double.infinity,
-                    child: TextButton(
-                      onPressed: () => _openUrl((kycState as KycSessionCreated).sessionUrl),
-                      child: Text(
-                        'Abrir verificación de nuevo',
-                        style: inter(
-                          fontSize: RTextSize.sm,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ),
               ],
               const SizedBox(height: RSpacing.s24),
             ],

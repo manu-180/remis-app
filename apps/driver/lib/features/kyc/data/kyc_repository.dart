@@ -5,7 +5,7 @@ class KycRepository {
   KycRepository(this._client);
   final SupabaseClient _client;
 
-  Future<Result<String, AppError>> createKycSession(String driverId) async {
+  Future<Result<bool, AppError>> createKycSession(String driverId) async {
     try {
       final response = await _client.functions.invoke(
         'kyc-create-session',
@@ -13,17 +13,10 @@ class KycRepository {
       );
 
       if (response.data == null) {
-        return Result.err(const DomainError(message: 'No se pudo crear la sesión de verificación.'));
+        return Result.err(const DomainError(message: 'No se pudo enviar la solicitud de verificación.'));
       }
 
-      final data = response.data as Map<String, dynamic>;
-      final sessionUrl = data['session_url'] as String?;
-
-      if (sessionUrl == null || sessionUrl.isEmpty) {
-        return Result.err(const DomainError(message: 'URL de verificación inválida.'));
-      }
-
-      return Result.ok(sessionUrl);
+      return Result.ok(true);
     } catch (e) {
       return Result.err(UnknownError(cause: e));
     }

@@ -77,37 +77,31 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const diditApiKey = Deno.env.get('DIDIT_API_KEY')!;
+  // Verificar si ya existe una solicitud pendiente o aprobada para este conductor
+  const { data: existing } = await supabase
+    .from('kyc_verifications')
+    .select('id, status')
+    .eq('driver_id', driver_id)
+    .in('status', ['pending', 'approved'])
+    .maybeSingle();
 
-  const diditRes = await fetch('https://api.didit.me/v1/sessions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${diditApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      callback_url: `${supabaseUrl}/functions/v1/kyc-didit-webhook`,
-      redirect_url: 'remisapp://kyc-complete',
-    }),
-  });
-
-  if (!diditRes.ok) {
-    const errText = await diditRes.text();
-    console.error('Didit API error:', diditRes.status, errText);
-    return new Response(JSON.stringify({ error: 'KYC provider error' }), {
-      status: 500,
-      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-    });
+  if (existing) {
+    // Ya tiene una verificación en curso o aprobada, devolver éxito sin duplicar
+    return new Response(
+      JSON.stringify({ submitted: true }),
+      {
+        status: 200,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      },
+    );
   }
 
-  const diditResponse: { session_id: string; session_url: string } = await diditRes.json();
-
+  // Crear registro de verificación manual (sin proveedor externo)
   const { error: insertError } = await supabase.from('kyc_verifications').insert({
     driver_id,
     provider: 'didit',
     status: 'pending',
-    metadata: { session_id: diditResponse.session_id },
+    metadata: { submitted_at: new Date().toISOString(), method: 'manual_review' },
   });
 
   if (insertError) {
@@ -119,10 +113,7 @@ Deno.serve(async (req: Request) => {
   }
 
   return new Response(
-    JSON.stringify({
-      session_url: diditResponse.session_url,
-      session_id: diditResponse.session_id,
-    }),
+    JSON.stringify({ submitted: true }),
     {
       status: 200,
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },

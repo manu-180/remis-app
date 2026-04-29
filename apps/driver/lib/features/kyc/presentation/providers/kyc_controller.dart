@@ -17,9 +17,8 @@ final class KycLoading extends KycUiState {
   const KycLoading();
 }
 
-final class KycSessionCreated extends KycUiState {
-  const KycSessionCreated(this.sessionUrl);
-  final String sessionUrl;
+final class KycPending extends KycUiState {
+  const KycPending();
 }
 
 final class KycSuccess extends KycUiState {
@@ -44,7 +43,7 @@ class KycController extends _$KycController {
     state = const KycLoading();
     final result = await _repo.createKycSession(_uid);
     result.fold(
-      (url) => state = KycSessionCreated(url),
+      (_) => state = const KycPending(),
       (err) => state = KycFailure(err.userMessage),
     );
   }
@@ -57,7 +56,7 @@ class KycController extends _$KycController {
         if (approved) {
           state = const KycSuccess();
         } else {
-          state = const KycFailure('Tu verificación aún no fue aprobada. Revisá tu correo o intentá de nuevo.');
+          state = const KycFailure('Tu verificación aún no fue aprobada. Intentá de nuevo más tarde.');
         }
       },
       (err) => state = KycFailure(err.userMessage),
