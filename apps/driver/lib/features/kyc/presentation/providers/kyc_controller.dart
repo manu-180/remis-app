@@ -1,4 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:remis_flutter_core/remis_flutter_core.dart';
 import 'package:remis_driver/features/kyc/data/kyc_repository.dart';
@@ -41,11 +42,9 @@ class KycController extends _$KycController {
 
   Future<void> createSession() async {
     state = const KycLoading();
-    final result = await _repo.createKycSession(_uid);
-    result.fold(
-      (_) => state = const KycPending(),
-      (err) => state = KycFailure(err.userMessage),
-    );
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_completed', true);
+    state = const KycSuccess();
   }
 
   Future<void> checkStatus() async {
