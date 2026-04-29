@@ -18,12 +18,18 @@ class RideConfirmationSheet extends ConsumerStatefulWidget {
     required this.dest,
     required this.pickupAddress,
     required this.onRideCreated,
+    this.onError,
   });
 
   final LatLng pickup;
   final DestinationResult dest;
   final String? pickupAddress;
   final void Function(RideModel) onRideCreated;
+
+  /// Called after the sheet is dismissed when ride creation fails.
+  /// Lets the caller surface the error in its own Scaffold so the
+  /// SnackBar isn't trapped behind the modal sheet.
+  final void Function(String message)? onError;
 
   @override
   ConsumerState<RideConfirmationSheet> createState() =>
@@ -88,13 +94,10 @@ class _RideConfirmationSheetState extends ConsumerState<RideConfirmationSheet>
       widget.onRideCreated(ride);
     } catch (e) {
       if (!context.mounted) return;
-      setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No se pudo crear el viaje: $e'),
-          backgroundColor: AppColors.danger,
-        ),
-      );
+      // Pop the sheet first so the SnackBar isn't trapped behind it,
+      // then surface the error through the parent.
+      Navigator.of(context).pop();
+      widget.onError?.call('No se pudo crear el viaje: $e');
     }
   }
 

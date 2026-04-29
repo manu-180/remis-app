@@ -253,6 +253,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           if (!mounted) return;
           context.go(AppRoutes.waiting, extra: ride.id);
         },
+        onError: (message) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: AppColors.danger,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        },
       ),
     );
 
