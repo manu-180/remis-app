@@ -218,6 +218,16 @@ class _KycOnboardingScreenState extends ConsumerState<KycOnboardingScreen> {
                         )
                       : const Text('Ya completé la verificación'),
                 ),
+                const SizedBox(height: RSpacing.s8),
+                Center(
+                  child: Text(
+                    '⚡ Modo demo — verificación simulada',
+                    style: inter(
+                      fontSize: RTextSize.xs,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.6),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: RSpacing.s12),
                 if (sessionCreated)
                   SizedBox(
