@@ -93,9 +93,31 @@ jobs:
         run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Inject Google Maps API key into local.properties
+        env:
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: |
-          echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" \
-            >> apps/${{ matrix.app }}/android/local.properties
+          # Inject newline-safe e idempotente:
+          # - garantiza newline final antes de appender (si flutter pub get dejó el archivo sin \n)
+          # - elimina cualquier GOOGLE_MAPS_API_KEY= preexistente para evitar duplicados
+          # - usa printf en vez de echo (más portable; sin interpretación de escapes)
+          LOCAL_PROPS="apps/${{ matrix.app }}/android/local.properties"
+          touch "$LOCAL_PROPS"
+          # asegura newline final si el archivo tiene contenido y no termina en \n
+          if [ -s "$LOCAL_PROPS" ] && [ "$(tail -c1 "$LOCAL_PROPS" | wc -l)" -eq 0 ]; then
+            printf '\n' >> "$LOCAL_PROPS"
+          fi
+          # remueve líneas previas con la misma key (idempotencia)
+          sed -i '/^GOOGLE_MAPS_API_KEY=/d' "$LOCAL_PROPS"
+          # appendea la key
+          printf 'GOOGLE_MAPS_API_KEY=%s\n' "$GOOGLE_MAPS_API_KEY" >> "$LOCAL_PROPS"
+          # verifica que la key quedó escrita (sin revelar el valor)
+          KEY_LEN=$(grep '^GOOGLE_MAPS_API_KEY=' "$LOCAL_PROPS" | head -1 | sed 's/^GOOGLE_MAPS_API_KEY=//' | tr -d '\n' | wc -c)
+          KEY_COUNT=$(grep -c '^GOOGLE_MAPS_API_KEY=' "$LOCAL_PROPS")
+          echo "::notice::local.properties has GOOGLE_MAPS_API_KEY (count=$KEY_COUNT, value length=$KEY_LEN)"
+          if [ "$KEY_LEN" -lt 30 ] || [ "$KEY_COUNT" -ne 1 ]; then
+            echo "::error::API key injection failed (length=$KEY_LEN, count=$KEY_COUNT). Expected length ~39, count=1."
+            exit 1
+          fi
 
       - name: Set up Android signing
         env:
@@ -133,10 +155,41 @@ jobs:
 
       - name: Build release APK (${{ matrix.app }})
         working-directory: apps/${{ matrix.app }}
+        env:
+          # Path primario para inyectar la key al manifest. build.gradle.kts lee
+          # esta env var primero y cae a local.properties solo si no está seteada.
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: |
           ENV_FILE="../../packages/flutter-core/env/dev.json"
           [ "${{ matrix.app }}" = "passenger" ] && ENV_FILE="env/dev.json"
           flutter build apk --release --dart-define-from-file="$ENV_FILE"
+
+      - name: Verify API key was embedded in APK manifest
+        run: |
+          APP="${{ matrix.app }}"
+          APK="apps/$APP/build/app/outputs/flutter-apk/app-release.apk"
+          # Localizar aapt (cualquier versión de build-tools sirve para dump xmltree)
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt 2>/dev/null | sort -V | tail -1)
+          if [ -z "$AAPT" ]; then
+            echo "::warning::aapt no encontrado, skip verification"
+            exit 0
+          fi
+          # Extraer el value del meta-data com.google.android.geo.API_KEY del manifest del APK
+          DUMP=$("$AAPT" dump xmltree "$APK" AndroidManifest.xml 2>/dev/null)
+          # Buscar el bloque de meta-data con name=geo.API_KEY y leer el value siguiente
+          KEY_VALUE=$(echo "$DUMP" | awk '
+            /android:name.*"com\.google\.android\.geo\.API_KEY"/ {found=1; next}
+            found && /android:value/ {
+              match($0, /Raw: "([^"]*)"/, arr);
+              print arr[1]; found=0
+            }
+          ')
+          KEY_LEN=$(printf '%s' "$KEY_VALUE" | wc -c)
+          echo "::notice::APK manifest API_KEY length: $KEY_LEN"
+          if [ "$KEY_LEN" -lt 30 ]; then
+            echo "::error::APK manifest tiene API key vacía o demasiado corta (len=$KEY_LEN). El build no inyectó la key correctamente."
+            exit 1
+          fi
 
       - name: Get current version
         id: version

@@ -46,7 +46,13 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 
-        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = localProps.getProperty("GOOGLE_MAPS_API_KEY") ?: ""
+        // Lee la API key desde (en orden):
+        //   1. Env var GOOGLE_MAPS_API_KEY  → usado por CI (más robusto que escribir a local.properties)
+        //   2. local.properties             → usado por dev local (vía pnpm env:sync)
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] =
+            System.getenv("GOOGLE_MAPS_API_KEY")
+            ?: localProps.getProperty("GOOGLE_MAPS_API_KEY")
+            ?: ""
     }
 
     signingConfigs {
