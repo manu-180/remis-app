@@ -1,5 +1,6 @@
 function getVolume(): number {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { useUIStore } = require('@/stores/ui-store');
     return useUIStore.getState().soundVolume ?? 0.6;
   } catch {
@@ -9,6 +10,7 @@ function getVolume(): number {
 
 function makeContext(): AudioContext | null {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return new (window.AudioContext ?? (window as any).webkitAudioContext)();
   } catch {
     return null;
@@ -138,6 +140,7 @@ export function stopSosSound(): void {
 
 export function registerAudioGesture(): void {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ctx = new (window.AudioContext ?? (window as any).webkitAudioContext)();
     ctx.resume().then(() => ctx.close()).catch(() => {});
   } catch {}
