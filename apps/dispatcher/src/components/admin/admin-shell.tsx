@@ -8,6 +8,7 @@ import { CommandPalette } from './command-palette';
 import { ConfirmDialogProvider } from './confirm-dialog';
 import { Drawer } from '@/components/ui/drawer';
 import { cn } from '@/lib/utils';
+import { useSosWatcher } from '@/hooks/use-sos-watcher';
 import type { Database } from '@remis/shared-types/database';
 
 type Role = Database['public']['Enums']['user_role'];
@@ -28,6 +29,9 @@ export function AdminShell({ profile, children }: AdminShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  // Global SOS watcher — alarm + notifications + badge count
+  useSosWatcher();
 
   // Leer estado colapsado de localStorage
   useEffect(() => {

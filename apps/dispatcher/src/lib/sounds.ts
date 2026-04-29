@@ -81,7 +81,10 @@ export function playDriverOfflineSound(): void {
   }
 }
 
-export function playSosSound(): () => void {
+// Module-level SOS stop function (so it can be stopped from anywhere)
+let _sosStopFn: (() => void) | null = null;
+
+function playSosSoundInternal(): () => void {
   const ctx = makeContext();
   if (!ctx) return () => {};
   const vol = getVolume();
@@ -119,6 +122,18 @@ export function playSosSound(): () => void {
       ctx.close();
     } catch {}
   };
+}
+
+export function playSosSound(): void {
+  stopSosSound(); // stop any existing alarm first
+  _sosStopFn = playSosSoundInternal();
+}
+
+export function stopSosSound(): void {
+  if (_sosStopFn) {
+    _sosStopFn();
+    _sosStopFn = null;
+  }
 }
 
 export function registerAudioGesture(): void {
