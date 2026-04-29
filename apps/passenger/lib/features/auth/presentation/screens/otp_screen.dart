@@ -57,7 +57,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
           final profile = await client
               .from('passengers')
               .select('id')
-              .eq('user_id', user.id)
+              .eq('id', user.id)
               .maybeSingle();
           if (!mounted) return;
           if (profile == null) {
