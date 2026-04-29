@@ -1,0 +1,75 @@
+name: Build Demo APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'App to build'
+        required: true
+        default: driver
+        type: choice
+        options: [driver, passenger]
+
+jobs:
+  build:
+    name: Build ${{ inputs.app }} debug APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        working-directory: apps/${{ inputs.app }}
+        run: flutter pub get
+
+      - name: Inject Google Maps API key into local.properties
+        run: |
+          MAPS_KEY=$(jq -r '.GOOGLE_MAPS_API_KEY' packages/flutter-core/env/dev.json)
+          echo "GOOGLE_MAPS_API_KEY=$MAPS_KEY" >> apps/${{ inputs.app }}/android/local.properties
+
+      - name: Build debug APK
+        working-directory: apps/${{ inputs.app }}
+        run: |
+          flutter build apk --debug \
+            --dart-define-from-file=../../packages/flutter-core/env/dev.json
+
+      - name: Get current version
+        id: version
+        working-directory: apps/${{ inputs.app }}
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Delete existing release
+        run: |
+          gh release delete "v${{ steps.version.outputs.version }}-${{ inputs.app }}" \
+            --yes --cleanup-tag || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create new release
+        run: |
+          APP_NAME="${{ inputs.app }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          EMOJI="🚗"
+          [ "$APP_NAME" = "passenger" ] && EMOJI="🛺"
+
+          gh release create "v${VERSION}-${APP_NAME}" \
+            --title "${EMOJI} ${APP_NAME^} App v${VERSION} — Demo" \
+            --notes "## Instalación
+
+          1. Descargá el APK en tu dispositivo Android
+          2. Abrí el archivo — si pide permiso para instalar apps desconocidas, habilitalo
+          3. Instalá y probá
+
+          > ⚠️ **Build de prueba** (debug mode). Conecta a Supabase desarrollo." \
+            "apps/${APP_NAME}/build/app/outputs/flutter-apk/app-debug.apk#${APP_NAME}-demo.apk"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
