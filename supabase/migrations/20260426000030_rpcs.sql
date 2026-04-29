@@ -97,33 +97,35 @@ begin
   v_dist_route    := v_dist_straight * 1.3;
 
   -- Zona de origen: polígono que contiene el pickup (mayor prioridad si hay superposición)
-  select id into v_origin_zone
-  from public.tariff_zones
-  where is_active = true
-    and st_contains(polygon, v_pickup)
-  order by priority desc
+  -- Cast a geometry: st_contains no existe para geography
+  select tz.id into v_origin_zone
+  from public.tariff_zones tz
+  where tz.is_active = true
+    and st_contains(tz.polygon::geometry, v_pickup::geometry)
+  order by tz.priority desc
   limit 1;
 
   -- Zona de destino
-  select id into v_dest_zone
-  from public.tariff_zones
-  where is_active = true
-    and st_contains(polygon, v_dest)
-  order by priority desc
+  select tz.id into v_dest_zone
+  from public.tariff_zones tz
+  where tz.is_active = true
+    and st_contains(tz.polygon::geometry, v_dest::geometry)
+  order by tz.priority desc
   limit 1;
 
   -- Buscar tarifa vigente para el par de zonas
-  select * into v_fare
-  from public.fares
-  where (origin_zone_id = v_origin_zone or origin_zone_id is null)
-    and (dest_zone_id   = v_dest_zone   or dest_zone_id   is null)
-    and effective_from <= at_time
-    and (effective_to is null or effective_to > at_time)
+  -- Alias `f.` evita ambigüedad con las columnas declaradas en RETURNS TABLE
+  select f.* into v_fare
+  from public.fares f
+  where (f.origin_zone_id = v_origin_zone or f.origin_zone_id is null)
+    and (f.dest_zone_id   = v_dest_zone   or f.dest_zone_id   is null)
+    and f.effective_from <= at_time
+    and (f.effective_to is null or f.effective_to > at_time)
   order by
     -- Preferir match exacto sobre wildcard (null = cualquier zona)
-    (case when origin_zone_id is not null then 1 else 0 end) desc,
-    (case when dest_zone_id   is not null then 1 else 0 end) desc,
-    effective_from desc
+    (case when f.origin_zone_id is not null then 1 else 0 end) desc,
+    (case when f.dest_zone_id   is not null then 1 else 0 end) desc,
+    f.effective_from desc
   limit 1;
 
   if not found then
