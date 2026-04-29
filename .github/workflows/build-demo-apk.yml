@@ -6,16 +6,20 @@ on:
       app:
         description: 'App to build'
         required: true
-        default: driver
+        default: both
         type: choice
-        options: [driver, passenger]
+        options: [both, driver, passenger]
 
 jobs:
   build:
-    name: Build ${{ inputs.app }} release APK
+    name: Build ${{ matrix.app }} APK
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJson(inputs.app == 'both' && '["driver","passenger"]' || format('["{0}"]', inputs.app)) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -41,9 +45,6 @@ jobs:
             echo "::error::Missing required secrets: ${missing[*]}"
             exit 1
           fi
-          # Print Supabase project ref so we can verify which project we're targeting.
-          # The ref is the subdomain portion (e.g. abc123def.supabase.co → abc123def).
-          # JWT iss claim is also "supabase", and ref is in the payload.
           ref=$(echo "$SUPABASE_URL" | sed -E 's|https?://([^.]+)\..*|\1|')
           jwt_ref=$(echo "$SUPABASE_ANON_KEY" | cut -d. -f2 | base64 -d 2>/dev/null | grep -oE '"ref":"[^"]+"' | cut -d'"' -f4 || echo "?")
           echo "::notice::Supabase project ref (from URL): $ref"
@@ -71,6 +72,9 @@ jobs:
             "ENVIRONMENT": "dev"
           }
           ENDOFFILE
+          # passenger también tiene su propio env/
+          mkdir -p apps/passenger/env
+          cp packages/flutter-core/env/dev.json apps/passenger/env/dev.json
 
       - name: Flutter pub get (flutter-core)
         working-directory: packages/flutter-core
@@ -80,18 +84,18 @@ jobs:
         working-directory: packages/flutter-core
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Flutter pub get
-        working-directory: apps/${{ inputs.app }}
+      - name: Flutter pub get (${{ matrix.app }})
+        working-directory: apps/${{ matrix.app }}
         run: flutter pub get
 
-      - name: Generate code
-        working-directory: apps/${{ inputs.app }}
+      - name: Generate code (${{ matrix.app }})
+        working-directory: apps/${{ matrix.app }}
         run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Inject Google Maps API key into local.properties
         run: |
           echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" \
-            >> apps/${{ inputs.app }}/android/local.properties
+            >> apps/${{ matrix.app }}/android/local.properties
 
       - name: Set up Android signing
         env:
@@ -100,7 +104,7 @@ jobs:
           KEYSTORE_KEY_ALIAS: ${{ secrets.KEYSTORE_KEY_ALIAS }}
           KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
         run: |
-          APP="${{ inputs.app }}"
+          APP="${{ matrix.app }}"
           python3 -c "import base64,os,sys; sys.stdout.buffer.write(base64.b64decode(''.join(os.environ['KEYSTORE_BASE64'].split())))" \
             > "apps/$APP/android/app/upload-keystore.jks"
           printf 'storeFile=upload-keystore.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
@@ -114,9 +118,7 @@ jobs:
           KEYSTORE_STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
           KEYSTORE_KEY_ALIAS: ${{ secrets.KEYSTORE_KEY_ALIAS }}
         run: |
-          APP="${{ inputs.app }}"
-          # Extract SHA-1 fingerprint. We isolate just the line we want so the
-          # password doesn't accidentally end up in logs.
+          APP="${{ matrix.app }}"
           fp=$(keytool -list -v \
             -keystore "apps/$APP/android/app/upload-keystore.jks" \
             -alias "$KEYSTORE_KEY_ALIAS" \
@@ -126,52 +128,53 @@ jobs:
             echo "::warning::Could not extract SHA-1 from release keystore"
           else
             echo "::notice::Release keystore SHA-1 (add to Google Maps API key restriction): $fp"
-            echo "::notice::Package name to restrict: $(grep applicationId apps/$APP/android/app/build.gradle.kts | head -1 | sed -E 's/.*"([^"]+)".*/\1/')"
+            echo "::notice::Package name: $(grep applicationId apps/$APP/android/app/build.gradle.kts | head -1 | sed -E 's/.*"([^"]+)".*/\1/')"
           fi
 
-      - name: Build release APK
-        working-directory: apps/${{ inputs.app }}
+      - name: Build release APK (${{ matrix.app }})
+        working-directory: apps/${{ matrix.app }}
         run: |
-          flutter build apk --release \
-            --dart-define-from-file=../../packages/flutter-core/env/dev.json
+          ENV_FILE="../../packages/flutter-core/env/dev.json"
+          [ "${{ matrix.app }}" = "passenger" ] && ENV_FILE="env/dev.json"
+          flutter build apk --release --dart-define-from-file="$ENV_FILE"
 
       - name: Get current version
         id: version
-        working-directory: apps/${{ inputs.app }}
+        working-directory: apps/${{ matrix.app }}
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Rename APK for clarity
+      - name: Rename APK
         run: |
-          APP_NAME="${{ inputs.app }}"
+          APP="${{ matrix.app }}"
           VERSION="${{ steps.version.outputs.version }}"
-          cp "apps/${APP_NAME}/build/app/outputs/flutter-apk/app-release.apk" \
-             "apps/${APP_NAME}/build/app/outputs/flutter-apk/${APP_NAME}-v${VERSION}.apk"
+          cp "apps/${APP}/build/app/outputs/flutter-apk/app-release.apk" \
+             "apps/${APP}/build/app/outputs/flutter-apk/${APP}-v${VERSION}.apk"
 
-      - name: Delete existing release
+      - name: Delete existing release (if any)
         run: |
-          gh release delete "v${{ steps.version.outputs.version }}-${{ inputs.app }}" \
-            --yes --cleanup-tag || true
+          gh release delete "v${{ steps.version.outputs.version }}-${{ matrix.app }}" \
+            --yes --cleanup-tag 2>/dev/null || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create new release
+      - name: Create GitHub release with APK
         run: |
-          APP_NAME="${{ inputs.app }}"
+          APP="${{ matrix.app }}"
           VERSION="${{ steps.version.outputs.version }}"
           EMOJI="🚗"
-          [ "$APP_NAME" = "passenger" ] && EMOJI="🛺"
+          [ "$APP" = "passenger" ] && EMOJI="🛺"
 
-          gh release create "v${VERSION}-${APP_NAME}" \
-            --title "${EMOJI} ${APP_NAME^} App v${VERSION}" \
+          gh release create "v${VERSION}-${APP}" \
+            --title "${EMOJI} ${APP^} App v${VERSION}" \
             --notes "## Instalación
 
-          1. Descargá el APK **${APP_NAME}-v${VERSION}.apk** en tu dispositivo Android
+          1. Descargá el APK **${APP}-v${VERSION}.apk** en tu dispositivo Android
           2. Abrí el archivo — si pide permiso para instalar apps desconocidas, habilitalo
           3. Instalá y probá
 
           > ⚠️ Si ya tenías una versión anterior instalada y da error, desinstalá la app vieja primero." \
-            "apps/${APP_NAME}/build/app/outputs/flutter-apk/${APP_NAME}-v${VERSION}.apk"
+            "apps/${APP}/build/app/outputs/flutter-apk/${APP}-v${VERSION}.apk"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
