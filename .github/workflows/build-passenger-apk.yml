@@ -48,6 +48,22 @@ jobs:
         working-directory: apps/passenger
         run: flutter pub get
 
+      # ── Signing ──────────────────────────────────────────────────────────────
+      - name: Set up Android signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
+          KEYSTORE_KEY_ALIAS: ${{ secrets.KEYSTORE_KEY_ALIAS }}
+          KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
+        run: |
+          python3 -c "import base64,os,sys; sys.stdout.buffer.write(base64.b64decode(''.join(os.environ['KEYSTORE_BASE64'].split())))" \
+            > "apps/passenger/android/app/upload-keystore.jks"
+          printf 'storeFile=upload-keystore.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$KEYSTORE_STORE_PASSWORD" \
+            "$KEYSTORE_KEY_ALIAS" \
+            "$KEYSTORE_KEY_PASSWORD" \
+            > "apps/passenger/android/key.properties"
+
       # ── Build APK ────────────────────────────────────────────────────────────
       # GOOGLE_MAPS_API_KEY en env → build.gradle.kts lo inyecta en el manifest
       - name: Build release APK
