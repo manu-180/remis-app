@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Inter, Inter_Tight, Geist_Mono } from 'next/font/google';
 import { PHProvider } from '@/components/providers/posthog-provider';
 import { PostHogPageView } from '@/components/posthog-page-view';
+import { Toaster } from '@/components/ui/toast';
 import './globals.css';
 
 const inter = Inter({
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <PHProvider>
           <PostHogPageView />
           {children}
+          <Toaster />
         </PHProvider>
       </body>
     </html>

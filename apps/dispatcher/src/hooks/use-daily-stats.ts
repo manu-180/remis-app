@@ -25,12 +25,22 @@ export function useDailyStats(): { stats: DailyStats | null; loading: boolean } 
         const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
         const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59).toISOString();
 
-        const { data: rides } = await supabase
+        type RideRow = {
+          status: string;
+          payment_method: string | null;
+          fare_amount: number | null;
+          assigned_at: string | null;
+          pickup_arrived_at: string | null;
+          requested_at: string | null;
+        };
+
+        const { data: rawRides } = await supabase
           .from('rides')
           .select('status, payment_method, fare_amount, assigned_at, pickup_arrived_at, requested_at')
           .gte('requested_at', startOfDay)
           .lte('requested_at', endOfDay);
 
+        const rides = rawRides as RideRow[] | null;
         if (!rides) return;
 
         const completed = rides.filter((r) => r.status === 'completed');
@@ -46,7 +56,7 @@ export function useDailyStats(): { stats: DailyStats | null; loading: boolean } 
 
         const assignmentTimes = rides
           .filter((r) => r.assigned_at && r.requested_at)
-          .map((r) => (new Date(r.assigned_at).getTime() - new Date(r.requested_at).getTime()) / 1000);
+          .map((r) => (new Date(r.assigned_at!).getTime() - new Date(r.requested_at!).getTime()) / 1000);
         const avgAssignment = assignmentTimes.length > 0
           ? assignmentTimes.reduce((a, b) => a + b, 0) / assignmentTimes.length
           : null;

@@ -64,6 +64,37 @@
   --ease-in:  cubic-bezier(0.7,0,0.84,0);
   --dur-instant: 80ms; --dur-fast: 150ms;
   --dur-normal: 240ms; --dur-slow: 360ms;
+
+  /* Glass surfaces */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(15, 23, 42, 0.06);
+  --glass-blur: 12px;
+
+  /* Premium gradients */
+  --gradient-brand: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-hover) 100%);
+  --gradient-accent: linear-gradient(135deg, var(--brand-accent) 0%, var(--brand-accent-hover) 100%);
+  --gradient-surface: linear-gradient(180deg, var(--neutral-0) 0%, var(--neutral-50) 100%);
+  --gradient-glow: radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--brand-accent) 20%, transparent) 0%, transparent 70%);
+
+  /* Focus rings — brand-accent dorado */
+  --focus-ring: 0 0 0 3px color-mix(in oklab, var(--brand-accent) 35%, transparent);
+  --focus-ring-danger: 0 0 0 3px color-mix(in oklab, var(--danger) 35%, transparent);
+
+  /* Status pills */
+  --pill-online: color-mix(in oklab, var(--success) 12%, transparent);
+  --pill-busy: color-mix(in oklab, var(--warning) 14%, transparent);
+  --pill-offline: color-mix(in oklab, var(--neutral-500) 14%, transparent);
+  --pill-danger: color-mix(in oklab, var(--danger) 14%, transparent);
+
+  /* Motion choreography */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Shimmer skeleton */
+  --shimmer: linear-gradient(90deg, transparent 0%, color-mix(in oklab, var(--neutral-300) 35%, transparent) 50%, transparent 100%);
+
+  /* Numeric font */
+  --font-numeric: 'Inter', ui-monospace, sans-serif;
 }
 
 /* Dark mode overrides */
@@ -89,6 +120,9 @@
   --warning:    #EAB308; --warning-bg:  #1F1B0E;
   --danger:     #EF4444; --danger-bg:   #27110F;
   --info:       #60A5FA; --info-bg:     #0E1B2D;
+
+  --glass-bg: rgba(15, 17, 23, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.06);
 }
 
 /* ── DENSITY ─────────────────────────────────────────────── */
@@ -112,6 +146,7 @@ body {
   color: var(--neutral-800);
   font-family: var(--font-family-body, Inter, sans-serif);
   -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
 /* Skip link */
@@ -134,4 +169,52 @@ body {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ── KEYFRAMES ───────────────────────────────────────────── */
+@keyframes shimmer-slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.7; transform: scale(1.05); }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes stripe-flow {
+  to { background-position: -2rem 0; }
+}
+
+/* ── UTILITY CLASSES ─────────────────────────────────────── */
+.tabular { font-variant-numeric: tabular-nums; }
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  border: 1px solid var(--glass-border);
+}
+
+.shimmer {
+  position: relative;
+  overflow: hidden;
+  background: var(--neutral-100);
+}
+.shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--shimmer);
+  animation: shimmer-slide 1.6s var(--ease-out) infinite;
+}
+
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }

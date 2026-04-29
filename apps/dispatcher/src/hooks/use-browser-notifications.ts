@@ -27,6 +27,6 @@ export function useBrowserNotifications() {
 
 export function sendNotification(title: string, body?: string) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  const n = new Notification(title, { body, icon: '/favicon.ico' });
+  const n = new Notification(title, { ...(body ? { body } : {}), icon: '/favicon.ico' });
   n.onclick = () => window.focus();
 }

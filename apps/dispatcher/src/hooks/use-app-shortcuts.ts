@@ -50,7 +50,8 @@ export function useAppShortcuts() {
       if (queuedRides.length === 0) return;
       const idx = queuedRides.findIndex((r) => r.id === selectedRideId);
       const prevIdx = idx <= 0 ? queuedRides.length - 1 : idx - 1;
-      selectRide(queuedRides[prevIdx].id);
+      const prevRide = queuedRides[prevIdx];
+      if (prevRide) selectRide(prevRide.id);
     },
     { preventDefault: true },
     [queuedRides, selectedRideId, selectRide],
@@ -62,7 +63,8 @@ export function useAppShortcuts() {
       if (queuedRides.length === 0) return;
       const idx = queuedRides.findIndex((r) => r.id === selectedRideId);
       const nextIdx = idx === -1 || idx === queuedRides.length - 1 ? 0 : idx + 1;
-      selectRide(queuedRides[nextIdx].id);
+      const nextRide = queuedRides[nextIdx];
+      if (nextRide) selectRide(nextRide.id);
     },
     { preventDefault: true },
     [queuedRides, selectedRideId, selectRide],
