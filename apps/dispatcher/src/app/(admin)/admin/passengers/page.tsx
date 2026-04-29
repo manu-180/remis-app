@@ -1,18 +1,13 @@
+import { requireRole } from '@/lib/auth/require-role';
 import { PageHeader } from '@/components/admin/page-header';
-import { Card, CardContent } from '@/components/ui/card';
+import { PassengersClient } from '@/components/admin/passengers/passengers-client';
 
-export default function AdminPassengersPage() {
+export default async function AdminPassengersPage() {
+  await requireRole(['admin']);
   return (
     <div className="space-y-6 p-6 lg:p-8">
-      <PageHeader
-        title="Pasajeros"
-        description="Listado y perfil de usuarios registrados como pasajeros."
-      />
-      <Card>
-        <CardContent className="py-12 text-center text-sm text-[var(--neutral-500)]">
-          En construcción
-        </CardContent>
-      </Card>
+      <PageHeader title="Pasajeros" />
+      <PassengersClient />
     </div>
   );
 }
