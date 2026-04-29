@@ -25,14 +25,32 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Create dev.json from secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: |
+          mkdir -p packages/flutter-core/env
+          cat > packages/flutter-core/env/dev.json << ENDOFFILE
+          {
+            "SUPABASE_URL": "${SUPABASE_URL}",
+            "SUPABASE_ANON_KEY": "${SUPABASE_ANON_KEY}",
+            "GOOGLE_MAPS_API_KEY": "${GOOGLE_MAPS_API_KEY}",
+            "MP_PUBLIC_KEY": "",
+            "SENTRY_DSN": "${SENTRY_DSN}",
+            "ENVIRONMENT": "dev"
+          }
+          ENDOFFILE
+
       - name: Flutter pub get
         working-directory: apps/${{ inputs.app }}
         run: flutter pub get
 
       - name: Inject Google Maps API key into local.properties
         run: |
-          MAPS_KEY=$(jq -r '.GOOGLE_MAPS_API_KEY' packages/flutter-core/env/dev.json)
-          echo "GOOGLE_MAPS_API_KEY=$MAPS_KEY" >> apps/${{ inputs.app }}/android/local.properties
+          echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" >> apps/${{ inputs.app }}/android/local.properties
 
       - name: Build debug APK
         working-directory: apps/${{ inputs.app }}
