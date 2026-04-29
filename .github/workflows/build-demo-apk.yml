@@ -72,13 +72,18 @@ jobs:
           KEYSTORE_KEY_ALIAS: ${{ secrets.KEYSTORE_KEY_ALIAS }}
           KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
         run: |
-          echo "$KEYSTORE_BASE64" | tr -d '\r' | base64 --decode \
-            > apps/${{ inputs.app }}/android/app/upload-keystore.jks
+          APP="${{ inputs.app }}"
+          python3 -c "
+import base64, os, sys
+raw = os.environ['KEYSTORE_BASE64'].strip()
+raw = ''.join(raw.split())
+sys.stdout.buffer.write(base64.b64decode(raw))
+" > "apps/$APP/android/app/upload-keystore.jks"
           printf 'storeFile=upload-keystore.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
             "$KEYSTORE_STORE_PASSWORD" \
             "$KEYSTORE_KEY_ALIAS" \
             "$KEYSTORE_KEY_PASSWORD" \
-            > apps/${{ inputs.app }}/android/key.properties
+            > "apps/$APP/android/key.properties"
 
       - name: Build release APK
         working-directory: apps/${{ inputs.app }}
