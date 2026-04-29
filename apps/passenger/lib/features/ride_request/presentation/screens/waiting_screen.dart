@@ -170,6 +170,7 @@ class _WaitingScreenState extends ConsumerState<WaitingScreen>
           .read(rideRepositoryProvider)
           .cancelRide(widget.rideId, 'passenger_cancelled_before_assign');
       if (!mounted) return;
+      HapticFeedback.mediumImpact();
       context.go(AppRoutes.home);
     } catch (e) {
       if (!mounted) return;

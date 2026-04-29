@@ -163,7 +163,7 @@ class _TripCompleteScreenState extends ConsumerState<TripCompleteScreen>
   }
 
   Future<void> _submit() async {
-    if (_stars == 0 || _isSubmitting) return;
+    if (_stars == 0 || _isSubmitting || widget.driver == null) return;
     HapticFeedback.mediumImpact();
     setState(() => _isSubmitting = true);
     try {
@@ -176,6 +176,7 @@ class _TripCompleteScreenState extends ConsumerState<TripCompleteScreen>
                 : _commentController.text.trim(),
           );
       if (!mounted) return;
+      HapticFeedback.lightImpact();
       context.go('/home');
     } catch (e) {
       if (!mounted) return;

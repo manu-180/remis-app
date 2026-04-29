@@ -643,6 +643,7 @@ class _PaymentSelector extends StatelessWidget {
           label: 'Mercado Pago',
           selected: selected == _PaymentMethod.mercadoPago,
           enabled: _mpEnabled,
+          showBadge: !_mpEnabled,
           onTap:
               _mpEnabled ? () => onChanged(_PaymentMethod.mercadoPago) : null,
         ),
@@ -657,6 +658,7 @@ class _PaymentChip extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.enabled,
+    this.showBadge = false,
     required this.onTap,
   });
 
@@ -664,6 +666,7 @@ class _PaymentChip extends StatelessWidget {
   final String label;
   final bool selected;
   final bool enabled;
+  final bool showBadge;
   final VoidCallback? onTap;
 
   @override
@@ -698,34 +701,64 @@ class _PaymentChip extends StatelessWidget {
             : theme.colorScheme.onSurfaceVariant;
 
     return Expanded(
-      child: GestureDetector(
-        onTap: enabled ? onTap : null,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: borderColor, width: 1.5),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: iconColor),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  label,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: textColor,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          GestureDetector(
+            onTap: enabled ? onTap : null,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: borderColor, width: 1.5),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 18, color: iconColor),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      label,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: textColor,
+                        fontWeight:
+                            selected ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  overflow: TextOverflow.ellipsis,
+                ],
+              ),
+            ),
+          ),
+          if (showBadge)
+            Positioned(
+              top: -8,
+              right: -4,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.brandAccent,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'PRÓXIMAMENTE',
+                  style: TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                    height: 1.2,
+                  ),
                 ),
               ),
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
   }

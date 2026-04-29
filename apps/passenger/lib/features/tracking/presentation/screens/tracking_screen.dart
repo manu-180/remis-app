@@ -185,15 +185,18 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
 
   // ── Share ──────────────────────────────────────────────────────────────────
   Future<void> _handleShare() async {
+    HapticFeedback.lightImpact();
     setState(() => _loadingShare = true);
     try {
       final token = await ref
           .read(rideRepositoryProvider)
           .createSharedTrip(_currentRide.id);
       if (!mounted) return;
+      HapticFeedback.mediumImpact();
       _showShareSheet('https://remis.app/v/$token');
     } catch (e) {
       if (!mounted) return;
+      HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Error al compartir: $e')));
     } finally {

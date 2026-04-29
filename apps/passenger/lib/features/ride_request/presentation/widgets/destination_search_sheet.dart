@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -109,6 +110,7 @@ class _DestinationSearchSheetState
       _query.isEmpty || text.toLowerCase().contains(_query);
 
   void _select(DestinationResult result) {
+    HapticFeedback.selectionClick();
     widget.onDestinationSelected(result);
   }
 
