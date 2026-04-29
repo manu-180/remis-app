@@ -1,18 +1,17 @@
+import { requireRole } from '@/lib/auth/require-role';
 import { PageHeader } from '@/components/admin/page-header';
-import { Card, CardContent } from '@/components/ui/card';
+import { ZonesClient } from '@/components/admin/zones/zones-client';
 
-export default function AdminZonesPage() {
+export default async function AdminZonesPage() {
+  await requireRole(['admin']);
   return (
-    <div className="space-y-6 p-6 lg:p-8">
-      <PageHeader
-        title="Zonas"
-        description="Definición y edición de zonas de cobertura del servicio."
-      />
-      <Card>
-        <CardContent className="py-12 text-center text-sm text-[var(--neutral-500)]">
-          En construcción
-        </CardContent>
-      </Card>
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
+      <div className="px-6 lg:px-8 py-4 shrink-0">
+        <PageHeader title="Zonas tarifarias" />
+      </div>
+      <div className="flex-1 overflow-hidden">
+        <ZonesClient />
+      </div>
     </div>
   );
 }
