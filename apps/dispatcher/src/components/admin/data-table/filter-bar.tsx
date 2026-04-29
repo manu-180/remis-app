@@ -176,14 +176,22 @@ function DateRangeFilter({
       <Input
         type="date"
         value={value.from ?? ''}
-        onChange={(e) => onChange({ ...value, from: e.target.value || undefined })}
+        onChange={(e) => {
+          const next = { ...value };
+          if (e.target.value) next.from = e.target.value; else delete next.from;
+          onChange(next);
+        }}
         className="w-[150px]"
       />
       <span className="text-[var(--neutral-400)] text-xs">→</span>
       <Input
         type="date"
         value={value.to ?? ''}
-        onChange={(e) => onChange({ ...value, to: e.target.value || undefined })}
+        onChange={(e) => {
+          const next = { ...value };
+          if (e.target.value) next.to = e.target.value; else delete next.to;
+          onChange(next);
+        }}
         className="w-[150px]"
       />
     </div>

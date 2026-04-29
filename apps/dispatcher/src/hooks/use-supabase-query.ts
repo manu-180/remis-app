@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+
+type SupabaseBrowserClient = ReturnType<typeof getSupabaseBrowserClient>;
 
 type QueryResult<T> = {
   data: T | null;
@@ -17,7 +18,7 @@ const queryCache = new Map<string, unknown>();
 export function useSupabaseQuery<T>(
   key: unknown[],
   queryFn: (
-    supabase: SupabaseClient,
+    supabase: SupabaseBrowserClient,
   ) => Promise<{ data: T | null; error: unknown }>,
   opts?: { enabled?: boolean },
 ): QueryResult<T> {

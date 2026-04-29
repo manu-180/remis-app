@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import type { RealtimePostgresChangesPayload, RealtimeChannel } from '@supabase/supabase-js';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 interface UseRealtimeTableOptions {
@@ -23,21 +23,24 @@ export function useRealtimeTable<T extends Record<string, unknown>>(
     const supabase = getSupabaseBrowserClient();
     const channelName = `realtime:${schema}:${table}:${event}:${filter ?? ''}`;
 
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event,
-          schema,
-          table,
-          ...(filter ? { filter } : {}),
-        } as Parameters<typeof channel.on>[1],
-        (payload: RealtimePostgresChangesPayload<T>) => {
-          callbackRef.current(payload);
-        },
-      )
-      .subscribe();
+    let channel: RealtimeChannel = supabase.channel(channelName);
+
+    channel = channel.on(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      'postgres_changes' as any,
+      {
+        event,
+        schema,
+        table,
+        ...(filter ? { filter } : {}),
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (payload: any) => {
+        callbackRef.current(payload as RealtimePostgresChangesPayload<T>);
+      },
+    );
+
+    channel.subscribe();
 
     return () => {
       void supabase.removeChannel(channel);

@@ -5,6 +5,7 @@ import {
   type ColumnDef,
   type SortingState,
   type RowSelectionState,
+  type Row,
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
@@ -16,7 +17,6 @@ import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Pagination } from '@/components/ui/pagination';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 type Density = 'comfortable' | 'compact' | 'dense';
@@ -274,12 +274,13 @@ export function DataTable<TData, TValue>({
               {shouldVirtualize
                 ? rowVirtualizer.getVirtualItems().map((virtualRow) => {
                     const row = rows[virtualRow.index];
+                    if (!row) return null;
                     return (
                       <TableRow
                         key={row.id}
                         row={row}
                         rowHeightClass={rowHeightClass}
-                        onRowClick={onRowClick}
+                        {...(onRowClick ? { onRowClick } : {})}
                         style={{
                           position: 'absolute',
                           top: 0,
@@ -295,7 +296,7 @@ export function DataTable<TData, TValue>({
                       key={row.id}
                       row={row}
                       rowHeightClass={rowHeightClass}
-                      onRowClick={onRowClick}
+                      {...(onRowClick ? { onRowClick } : {})}
                     />
                   ))}
             </tbody>
@@ -315,8 +316,6 @@ export function DataTable<TData, TValue>({
 }
 
 // Inner row component to keep JSX clean
-import type { Row } from '@tanstack/react-table';
-
 interface TableRowProps<TData> {
   row: Row<TData>;
   rowHeightClass: string;

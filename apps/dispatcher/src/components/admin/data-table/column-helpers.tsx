@@ -19,7 +19,7 @@ export function createTextColumn<T>(
   return {
     accessorKey: key as string,
     header: label,
-    size: opts?.minWidth,
+    ...(opts?.minWidth !== undefined ? { size: opts.minWidth } : {}),
     cell: ({ getValue }) => (
       <span className="block truncate" title={String(getValue() ?? '')}>
         {String(getValue() ?? '')}
@@ -79,6 +79,8 @@ export function createDateColumn<T>(
 // ---------------------------------------------------------------------------
 export function createStatusColumn<T>(
   getStatus: (row: T) => { variant: PillVariant; label: string },
+  // type is reserved for future use (e.g. different pill rendering per entity)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _type: 'driver' | 'ride',
 ): ColumnDef<T, unknown> {
   return {
@@ -141,6 +143,7 @@ export function createAvatarColumn<T>(
       return (
         <div className="flex items-center gap-2.5">
           {src ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={src}
               alt={name}
@@ -173,6 +176,74 @@ interface ActionItem<T> {
   danger?: boolean;
 }
 
+interface ActionsMenuProps<T> {
+  row: T;
+  actions: ActionItem<T>[];
+}
+
+function ActionsMenu<T>({ row, actions }: ActionsMenuProps<T>) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div className="relative flex justify-center" ref={ref}>
+      <button
+        className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--neutral-500)] hover:bg-[var(--neutral-100)] hover:text-[var(--neutral-900)] transition-colors"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        aria-label="Acciones"
+        title="Acciones"
+      >
+        <MoreVertical size={16} />
+      </button>
+      {open && (
+        <div
+          className={cn(
+            'absolute right-0 top-full z-50 mt-1 min-w-[160px]',
+            'rounded-[var(--radius-md)] border border-[var(--neutral-200)]',
+            'bg-[var(--neutral-0)] shadow-[var(--shadow-lg)] py-1',
+          )}
+        >
+          {actions.map((action, i) => (
+            <button
+              key={i}
+              className={cn(
+                'flex w-full items-center gap-2 px-3 py-2 text-left text-[var(--text-sm)]',
+                'hover:bg-[var(--neutral-50)] transition-colors',
+                action.danger
+                  ? 'text-[var(--danger)]'
+                  : 'text-[var(--neutral-700)]',
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+                action.onClick(row);
+              }}
+              title={action.label}
+            >
+              {action.icon}
+              {action.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function createActionsColumn<T>(
   actions: ActionItem<T>[],
 ): ColumnDef<T, unknown> {
@@ -181,67 +252,6 @@ export function createActionsColumn<T>(
     header: '',
     size: 52,
     enableSorting: false,
-    cell: ({ row }) => {
-      const [open, setOpen] = React.useState(false);
-      const ref = React.useRef<HTMLDivElement>(null);
-
-      React.useEffect(() => {
-        if (!open) return;
-        const handler = (e: MouseEvent) => {
-          if (ref.current && !ref.current.contains(e.target as Node)) {
-            setOpen(false);
-          }
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-      }, [open]);
-
-      return (
-        <div className="relative flex justify-center" ref={ref}>
-          <button
-            className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--neutral-500)] hover:bg-[var(--neutral-100)] hover:text-[var(--neutral-900)] transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen((o) => !o);
-            }}
-            aria-label="Acciones"
-            title="Acciones"
-          >
-            <MoreVertical size={16} />
-          </button>
-          {open && (
-            <div
-              className={cn(
-                'absolute right-0 top-full z-50 mt-1 min-w-[160px]',
-                'rounded-[var(--radius-md)] border border-[var(--neutral-200)]',
-                'bg-[var(--neutral-0)] shadow-[var(--shadow-lg)] py-1',
-              )}
-            >
-              {actions.map((action, i) => (
-                <button
-                  key={i}
-                  className={cn(
-                    'flex w-full items-center gap-2 px-3 py-2 text-left text-[var(--text-sm)]',
-                    'hover:bg-[var(--neutral-50)] transition-colors',
-                    action.danger
-                      ? 'text-[var(--danger)]'
-                      : 'text-[var(--neutral-700)]',
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpen(false);
-                    action.onClick(row.original);
-                  }}
-                  title={action.label}
-                >
-                  {action.icon}
-                  {action.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    },
+    cell: ({ row }) => <ActionsMenu row={row.original} actions={actions} />,
   };
 }

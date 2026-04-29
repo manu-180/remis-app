@@ -1,12 +1,24 @@
 'use client';
 
-import { useState } from 'react';
-import { Car, Users, AlertTriangle, Package } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { useState, useMemo } from 'react';
+import { Car, Users, AlertTriangle, Package, Eye, Pencil, Trash2 } from 'lucide-react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { DataTable } from '@/components/admin/data-table/data-table';
+import {
+  createAvatarColumn,
+  createStatusColumn,
+  createTabularColumn,
+  createTextColumn,
+  createActionsColumn,
+} from '@/components/admin/data-table/column-helpers';
+import { FilterBar } from '@/components/admin/data-table/filter-bar';
+import type { FilterConfig } from '@/components/admin/data-table/filter-bar';
+import type { PillVariant } from '@/components/ui/status-pill';
+import { toast } from '@/components/ui/use-toast';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Stat } from '@/components/ui/stat';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Drawer, DrawerTrigger } from '@/components/ui/drawer';
-import { toast } from '@/components/ui/use-toast';
+import { Drawer } from '@/components/ui/drawer';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Switch } from '@/components/ui/switch';
 import { Select } from '@/components/ui/select';
@@ -20,6 +32,47 @@ import { StatusPill } from '@/components/ui/status-pill';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
+// ---------------------------------------------------------------------------
+// Mock driver data
+// ---------------------------------------------------------------------------
+type DriverStatus = 'online' | 'busy' | 'offline';
+
+interface MockDriver {
+  id: string;
+  name: string;
+  avatar: string | null;
+  status: DriverStatus;
+  rating: number;
+  vehicle: string;
+  trips: number;
+}
+
+const STATUS_LABELS: Record<DriverStatus, string> = {
+  online: 'Disponible',
+  busy: 'En viaje',
+  offline: 'Sin conexión',
+};
+
+const mockDrivers: MockDriver[] = Array.from({ length: 50 }, (_, i) => {
+  const statuses: DriverStatus[] = ['online', 'busy', 'offline'];
+  return {
+    id: String(i + 1),
+    name: `Conductor ${i + 1}`,
+    avatar: null,
+    status: statuses[i % 3] as DriverStatus,
+    rating: Number((3.5 + (i % 15) * 0.1).toFixed(1)),
+    vehicle: `${['Toyota', 'Volkswagen', 'Ford', 'Chevrolet'][i % 4]} ${['Corolla', 'Gol', 'Focus', 'Cruze'][i % 4]}`,
+    trips: 20 + i * 3,
+  };
+});
+
+// ---------------------------------------------------------------------------
+// DataTable showcase filters config
+// ---------------------------------------------------------------------------
+const driverFilters: FilterConfig[] = [
+  { id: 'search', type: 'search', placeholder: 'Buscar conductor...' },
+];
+
 export function ShowcaseClient() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [density, setDensity] = useState<'comfortable' | 'compact' | 'dense'>('comfortable');
@@ -29,6 +82,13 @@ export function ShowcaseClient() {
   const [comboVal, setComboVal] = useState('');
   const [page, setPage] = useState(1);
   const [skeletonLoading] = useState(true);
+
+  // DataTable state
+  const [tableLoading, setTableLoading] = useState(false);
+  const [tableError, setTableError] = useState<Error | null>(null);
+  const [tableFilters, setTableFilters] = useState<Record<string, unknown>>({ search: '' });
+  const [tablePage, setTablePage] = useState(0);
+  const PAGE_SIZE = 10;
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
@@ -281,6 +341,146 @@ export function ShowcaseClient() {
         <Pagination page={page} totalPages={12} onPageChange={setPage} />
         <p className="text-sm text-[var(--neutral-500)]">Página actual: {page}</p>
       </section>
+
+      {/* DataTable */}
+      <DataTableShowcase
+        tableLoading={tableLoading}
+        setTableLoading={setTableLoading}
+        tableError={tableError}
+        setTableError={setTableError}
+        tableFilters={tableFilters}
+        setTableFilters={setTableFilters}
+        tablePage={tablePage}
+        setTablePage={setTablePage}
+        pageSize={PAGE_SIZE}
+      />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DataTable showcase sub-component
+// ---------------------------------------------------------------------------
+interface DataTableShowcaseProps {
+  tableLoading: boolean;
+  setTableLoading: (v: boolean) => void;
+  tableError: Error | null;
+  setTableError: (v: Error | null) => void;
+  tableFilters: Record<string, unknown>;
+  setTableFilters: (v: Record<string, unknown>) => void;
+  tablePage: number;
+  setTablePage: (v: number) => void;
+  pageSize: number;
+}
+
+function DataTableShowcase({
+  tableLoading,
+  setTableLoading,
+  tableError,
+  setTableError,
+  tableFilters,
+  setTableFilters,
+  tablePage,
+  setTablePage,
+  pageSize,
+}: DataTableShowcaseProps) {
+  const driverColumns = useMemo<ColumnDef<MockDriver, unknown>[]>(
+    () => [
+      createAvatarColumn<MockDriver>(
+        (row) => row.avatar,
+        (row) => row.name,
+      ) as ColumnDef<MockDriver, unknown>,
+      createStatusColumn<MockDriver>(
+        (row) => ({
+          variant: row.status as PillVariant,
+          label: STATUS_LABELS[row.status],
+        }),
+        'driver',
+      ),
+      createTabularColumn<MockDriver>('rating', 'Rating') as ColumnDef<MockDriver, unknown>,
+      createTextColumn<MockDriver>('vehicle', 'Vehículo') as ColumnDef<MockDriver, unknown>,
+      createTabularColumn<MockDriver>('trips', 'Viajes', { suffix: '' }) as ColumnDef<MockDriver, unknown>,
+      createActionsColumn<MockDriver>([
+        {
+          icon: <Eye size={14} />,
+          label: 'Ver detalle',
+          onClick: (row) => toast.info(`Ver: ${row.name}`),
+        },
+        {
+          icon: <Pencil size={14} />,
+          label: 'Editar',
+          onClick: (row) => toast.info(`Editar: ${row.name}`),
+        },
+        {
+          icon: <Trash2 size={14} />,
+          label: 'Eliminar',
+          onClick: (row) => toast.error(`Eliminar: ${row.name}`),
+          danger: true,
+        },
+      ]) as ColumnDef<MockDriver, unknown>,
+    ],
+    [],
+  );
+
+  const filteredData = useMemo(() => {
+    const search = typeof tableFilters.search === 'string' ? tableFilters.search.toLowerCase() : '';
+    return mockDrivers.filter((d) =>
+      search ? d.name.toLowerCase().includes(search) : true,
+    );
+  }, [tableFilters]);
+
+  const paginatedData = useMemo(
+    () => filteredData.slice(tablePage * pageSize, (tablePage + 1) * pageSize),
+    [filteredData, tablePage, pageSize],
+  );
+
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-[var(--neutral-800)]">DataTable</h2>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setTableLoading(!tableLoading)}
+          >
+            {tableLoading ? 'Quitar carga' : 'Simular carga'}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() =>
+              setTableError(tableError ? null : new Error('Error de conexión simulado'))
+            }
+          >
+            {tableError ? 'Quitar error' : 'Simular error'}
+          </Button>
+        </div>
+      </div>
+
+      <FilterBar
+        filters={driverFilters}
+        value={tableFilters}
+        onChange={(v) => {
+          setTableFilters(v);
+          setTablePage(0);
+        }}
+      />
+
+      <DataTable<MockDriver, unknown>
+        columns={driverColumns}
+        data={paginatedData}
+        loading={tableLoading}
+        error={tableError}
+        getRowId={(row) => row.id}
+        onRowClick={(row) => toast.info(`Row clickeado: ID ${row.id}`)}
+        pagination={{
+          pageIndex: tablePage,
+          pageSize,
+          total: filteredData.length,
+          onChange: ({ pageIndex }) => setTablePage(pageIndex),
+        }}
+      />
+    </section>
   );
 }
