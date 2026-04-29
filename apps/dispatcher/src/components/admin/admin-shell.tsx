@@ -5,6 +5,7 @@ import { Sidebar, MobileSidebar } from './sidebar';
 import { TopBar } from './top-bar';
 import { PageTransition } from './page-transition';
 import { CommandPalette } from './command-palette';
+import { ShortcutHelpModal } from './shortcut-help-modal';
 import { ConfirmDialogProvider } from './confirm-dialog';
 import { Drawer } from '@/components/ui/drawer';
 import { cn } from '@/lib/utils';
@@ -105,6 +106,9 @@ export function AdminShell({ profile, children }: AdminShellProps) {
 
       {/* Command palette global */}
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
+
+      {/* Shortcut help modal */}
+      <ShortcutHelpModal />
     </div>
   );
 }
