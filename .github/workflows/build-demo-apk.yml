@@ -94,6 +94,13 @@ jobs:
           VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Rename APK for clarity
+        run: |
+          APP_NAME="${{ inputs.app }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          cp "apps/${APP_NAME}/build/app/outputs/flutter-apk/app-release.apk" \
+             "apps/${APP_NAME}/build/app/outputs/flutter-apk/${APP_NAME}-v${VERSION}.apk"
+
       - name: Delete existing release
         run: |
           gh release delete "v${{ steps.version.outputs.version }}-${{ inputs.app }}" \
@@ -112,9 +119,11 @@ jobs:
             --title "${EMOJI} ${APP_NAME^} App v${VERSION}" \
             --notes "## Instalación
 
-          1. Descargá el APK en tu dispositivo Android
+          1. Descargá el APK **${APP_NAME}-v${VERSION}.apk** en tu dispositivo Android
           2. Abrí el archivo — si pide permiso para instalar apps desconocidas, habilitalo
-          3. Instalá y probá" \
-            "apps/${APP_NAME}/build/app/outputs/flutter-apk/app-release.apk#${APP_NAME}.apk"
+          3. Instalá y probá
+
+          > ⚠️ Si ya tenías una versión anterior instalada y da error, desinstalá la app vieja primero." \
+            "apps/${APP_NAME}/build/app/outputs/flutter-apk/${APP_NAME}-v${VERSION}.apk"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

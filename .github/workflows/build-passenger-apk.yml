@@ -75,6 +75,11 @@ jobs:
             --dart-define-from-file=env/prd.json
 
       # ── Publicar en GitHub Releases ──────────────────────────────────────────
+      - name: Rename APK for clarity
+        run: |
+          cp apps/passenger/build/app/outputs/flutter-apk/app-release.apk \
+             apps/passenger/build/app/outputs/flutter-apk/passenger-latest.apk
+
       - name: Delete previous release (if exists)
         run: gh release delete passenger-latest --yes || true
         env:
@@ -84,8 +89,10 @@ jobs:
         run: |
           gh release create passenger-latest \
             --title "Passenger — Latest Build ($(date '+%d/%m/%Y %H:%M'))" \
-            --notes "APK generado automáticamente desde \`main\`. Para testing interno." \
+            --notes "APK generado automáticamente desde \`main\`. Para testing interno.
+
+          > ⚠️ Si ya tenías una versión anterior y da error, desinstalá la app vieja primero." \
             --prerelease \
-            apps/passenger/build/app/outputs/flutter-apk/app-release.apk
+            apps/passenger/build/app/outputs/flutter-apk/passenger-latest.apk
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
