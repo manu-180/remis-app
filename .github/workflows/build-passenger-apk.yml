@@ -1,0 +1,75 @@
+name: Build Passenger APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/passenger/**'
+      - 'packages/flutter-core/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build & publish APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.3'
+          channel: stable
+          cache: true
+
+      # ── Generar env/prd.json con las secrets de GitHub ──────────────────────
+      - name: Create env/prd.json
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: |
+          mkdir -p apps/passenger/env
+          cat > apps/passenger/env/prd.json << ENDOFFILE
+          {
+            "SUPABASE_URL": "${SUPABASE_URL}",
+            "SUPABASE_ANON_KEY": "${SUPABASE_ANON_KEY}",
+            "GOOGLE_MAPS_API_KEY": "${GOOGLE_MAPS_API_KEY}",
+            "SENTRY_DSN": "${SENTRY_DSN}",
+            "ENVIRONMENT": "prd"
+          }
+          ENDOFFILE
+
+      - name: flutter pub get
+        working-directory: apps/passenger
+        run: flutter pub get
+
+      # ── Build APK ────────────────────────────────────────────────────────────
+      # GOOGLE_MAPS_API_KEY en env → build.gradle.kts lo inyecta en el manifest
+      - name: Build release APK
+        working-directory: apps/passenger
+        env:
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+        run: |
+          flutter build apk --release \
+            --dart-define-from-file=env/prd.json
+
+      # ── Publicar en GitHub Releases ──────────────────────────────────────────
+      - name: Delete previous release (if exists)
+        run: gh release delete passenger-latest --yes || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create release with APK
+        run: |
+          gh release create passenger-latest \
+            --title "Passenger — Latest Build ($(date '+%d/%m/%Y %H:%M'))" \
+            --notes "APK generado automáticamente desde \`main\`. Para testing interno." \
+            --prerelease \
+            apps/passenger/build/app/outputs/flutter-apk/app-release.apk
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

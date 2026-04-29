@@ -34,7 +34,10 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 
-        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = localProps.getProperty("GOOGLE_MAPS_API_KEY") ?: ""
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] =
+            System.getenv("GOOGLE_MAPS_API_KEY")
+            ?: localProps.getProperty("GOOGLE_MAPS_API_KEY")
+            ?: ""
     }
 
     buildTypes {
