@@ -35,18 +35,8 @@ class _State extends State<StepFunctionalTest> {
       return;
     }
 
-    var agencyId = '';
     try {
-      final driverRow = await Supabase.instance.client
-          .from('drivers')
-          .select('agency_id')
-          .eq('id', session.user.id)
-          .single();
-      agencyId = (driverRow['agency_id'] as String?) ?? '';
-    } catch (_) {}
-
-    try {
-      await LocationService.init(session: session, agencyId: agencyId);
+      await LocationService.init(session: session);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

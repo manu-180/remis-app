@@ -6,10 +6,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:remis_flutter_core/remis_flutter_core.dart';
 
 class LocationService {
-  static Future<void> init({
-    required Session session,
-    required String agencyId,
-  }) async {
+  static bool _ready = false;
+
+  static Future<void> init({required Session session}) async {
     await bg.BackgroundGeolocation.ready(bg.Config(
       desiredAccuracy: bg.Config.DESIRED_ACCURACY_HIGH,
       distanceFilter: 20.0,
@@ -69,12 +68,14 @@ class LocationService {
           ? bg.Config.LOG_LEVEL_VERBOSE
           : bg.Config.LOG_LEVEL_ERROR,
     ));
+    _ready = true;
   }
 
   static Future<void> start() => bg.BackgroundGeolocation.start();
   static Future<void> stop() => bg.BackgroundGeolocation.stop();
 
   static Future<bg.Location?> getCurrentLocation() async {
+    if (!_ready) return null;
     try {
       return await bg.BackgroundGeolocation.getCurrentPosition(
         timeout: 30,
@@ -88,12 +89,11 @@ class LocationService {
   }
 
   static void enableRealtimeBroadcast({
-    required String agencyId,
     required RealtimeClient realtime,
     required String driverId,
   }) {
     bg.BackgroundGeolocation.onLocation((location) {
-      realtime.channel('agency:$agencyId:locations').sendBroadcastMessage(
+      realtime.channel('driver:locations').sendBroadcastMessage(
         event: 'pos',
         payload: {
           'driver_id': driverId,

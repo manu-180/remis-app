@@ -51,17 +51,10 @@ class ShiftController extends _$ShiftController {
       }
 
       final session = Supabase.instance.client.auth.currentSession!;
-      final driverRow = await Supabase.instance.client
-          .from('drivers')
-          .select('agency_id')
-          .eq('id', _uid)
-          .single();
-      final agencyId = (driverRow['agency_id'] as String?) ?? '';
 
-      await LocationService.init(session: session, agencyId: agencyId);
+      await LocationService.init(session: session);
       await LocationService.start();
       LocationService.enableRealtimeBroadcast(
-        agencyId: agencyId,
         realtime: Supabase.instance.client.realtime,
         driverId: _uid,
       );
