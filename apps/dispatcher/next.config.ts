@@ -5,7 +5,6 @@ const nextConfig: NextConfig = {
   transpilePackages: ['@remis/shared-types'],
   experimental: {
     optimizePackageImports: ['lucide-react'],
-    instrumentationHook: true,
   },
   async headers() {
     return [

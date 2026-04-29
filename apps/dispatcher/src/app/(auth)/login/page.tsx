@@ -32,10 +32,14 @@ export default function LoginPage() {
 
       if (!profile || !['dispatcher', 'admin'].includes(profile.role)) {
         await supabase.auth.signOut();
-        throw new Error('No tenés permisos para acceder al panel de despacho.');
+        throw new Error('No tenés permisos para acceder al panel.');
       }
 
-      router.push('/');
+      if (profile.role === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al iniciar sesión. Verificá tus credenciales.');
     } finally {
