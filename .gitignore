@@ -34,6 +34,7 @@ coverage/
 **/ios/.symlinks/
 **/ios/Runner.xcworkspace/xcuserdata/
 **/ios/Runner.xcodeproj/xcuserdata/
+**/ios/Flutter/Secrets.xcconfig
 **/android/.gradle/
 **/android/app/build/
 **/android/captures/

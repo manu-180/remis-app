@@ -188,6 +188,19 @@ for (const envName of targets) {
     }
   }
 
+  // iOS Secrets.xcconfig (inyecta GOOGLE_MAPS_API_KEY como variable Xcode para Info.plist)
+  if (envName === 'dev') {
+    const key = vars.GOOGLE_MAPS_API_KEY ?? '';
+    const xcconfig = `// AUTO-GENERATED por scripts/sync-env.mjs — NO editar a mano.\nGOOGLE_MAPS_API_KEY = ${key}\n`;
+    for (const app of ['driver', 'passenger']) {
+      const xcconfigPath = join(ROOT, 'apps', app, 'ios/Flutter/Secrets.xcconfig');
+      if (!checkOnly) {
+        writeFileSync(xcconfigPath, xcconfig, 'utf8');
+      }
+      console.log(`✅ [${envName}] ${xcconfigPath.replace(ROOT, '.')} (GOOGLE_MAPS_API_KEY)`);
+    }
+  }
+
   // Next.js apps (solo para 'dev' por defecto; cambiar manualmente para deploy)
   if (envName === 'dev') {
     for (const app of ['web', 'dispatcher']) {
