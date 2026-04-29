@@ -5,6 +5,7 @@ import { Sidebar, MobileSidebar } from './sidebar';
 import { TopBar } from './top-bar';
 import { PageTransition } from './page-transition';
 import { CommandPalette } from './command-palette';
+import { ConfirmDialogProvider } from './confirm-dialog';
 import { Drawer } from '@/components/ui/drawer';
 import { cn } from '@/lib/utils';
 import type { Database } from '@remis/shared-types/database';
@@ -92,7 +93,9 @@ export function AdminShell({ profile, children }: AdminShellProps) {
         />
 
         <main id="main-content" className="flex-1">
-          <PageTransition>{children}</PageTransition>
+          <ConfirmDialogProvider>
+            <PageTransition>{children}</PageTransition>
+          </ConfirmDialogProvider>
         </main>
       </div>
 
