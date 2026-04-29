@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../home/presentation/widgets/map_style.dart';
@@ -138,6 +139,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
   }
 
   Future<void> _handleCancel() async {
+    // Guard: no abrir diálogo si ya hay un cancel en vuelo
+    if (_cancelling) return;
+
     HapticFeedback.mediumImpact();
     final confirmed = await showDialog<bool>(
       context: context,
@@ -165,6 +169,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       ),
     );
     if (confirmed != true || !mounted) return;
+    // Guard de nuevo post-await: puede haber pasado tiempo durante el diálogo
+    if (_cancelling) return;
 
     setState(() => _cancelling = true);
     try {
@@ -172,12 +178,27 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
           .read(rideRepositoryProvider)
           .cancelRide(_currentRide.id, 'passenger_cancelled_after_assign');
       if (!mounted) return;
+      HapticFeedback.mediumImpact();
       context.go('/home');
-    } catch (e) {
+    } on PostgrestException catch (e) {
+      if (!mounted) return;
+      // 'ride_not_cancellable' / 'ride_not_found' → pedido ya terminado.
+      // Desde la perspectiva del pasajero, el resultado es el mismo: ir a home.
+      if (e.hint == 'ride_not_cancellable' || e.hint == 'ride_not_found') {
+        HapticFeedback.mediumImpact();
+        context.go('/home');
+        return;
+      }
+      HapticFeedback.heavyImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo cancelar. Intentá de nuevo.')),
+      );
+    } catch (_) {
       if (!mounted) return;
       HapticFeedback.heavyImpact();
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error al cancelar: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error de conexión. Verificá tu internet.')),
+      );
     } finally {
       if (mounted) setState(() => _cancelling = false);
     }

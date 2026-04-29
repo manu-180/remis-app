@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/models/ride_model.dart';
 import '../../data/ride_providers.dart';
 import '../../data/ride_repository.dart';
@@ -166,6 +167,14 @@ class _WaitingScreenState extends ConsumerState<WaitingScreen>
   }
 
   void _onDragEnd(DragEndDetails d) {
+    // Guard: no abrir diálogo si ya hay un cancel en vuelo
+    if (_cancelling) {
+      setState(() {
+        _dragOffset = 0;
+        _isSpringBack = false;
+      });
+      return;
+    }
     final vel = d.primaryVelocity ?? 0;
     if (_dragOffset >= _cancelThresholdPx || vel >= _cancelThresholdVel) {
       setState(() {
@@ -218,6 +227,8 @@ class _WaitingScreenState extends ConsumerState<WaitingScreen>
   }
 
   Future<void> _cancelRide() async {
+    // Guard: evita doble llamada si el botón y el gesto disparan a la vez
+    if (_cancelling) return;
     setState(() => _cancelling = true);
     try {
       await ref
@@ -226,13 +237,32 @@ class _WaitingScreenState extends ConsumerState<WaitingScreen>
       if (!mounted) return;
       HapticFeedback.mediumImpact();
       context.go(AppRoutes.home);
-    } catch (e) {
+    } on PostgrestException catch (e) {
+      if (!mounted) return;
+      // 'ride_not_cancellable' → el pedido ya estaba cancelado/completado.
+      // El SQL v3 es idempotente y nunca debería llegar aquí para cancelados,
+      // pero si el servidor corre una versión anterior esta es la red de seguridad.
+      if (e.hint == 'ride_not_cancellable' || e.hint == 'ride_not_found') {
+        HapticFeedback.mediumImpact();
+        context.go(AppRoutes.home);
+        return;
+      }
+      // Error real de base de datos
+      setState(() => _cancelling = false);
+      HapticFeedback.heavyImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo cancelar. Intentá de nuevo.'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    } catch (_) {
       if (!mounted) return;
       setState(() => _cancelling = false);
       HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No se pudo cancelar: $e'),
+        const SnackBar(
+          content: Text('Error de conexión. Verificá tu internet.'),
           backgroundColor: AppColors.danger,
         ),
       );
@@ -247,10 +277,19 @@ class _WaitingScreenState extends ConsumerState<WaitingScreen>
       activeRideStreamProvider(widget.rideId),
       (_, next) {
         next.whenData((ride) {
-          if (ride.status != RideStatus.requested) {
+          if (!mounted) return;
+          if (ride.status.isTerminal) {
+            // Cancelado por cualquiera (pasajero, conductor, despachante)
+            // o completado: siempre volver a home.
+            // Si _cancelRide() ya está en curso, también navega aquí y deja
+            // que el await de _cancelRide() falle silenciosamente con !mounted.
+            context.go(AppRoutes.home);
+          } else if (ride.status != RideStatus.requested) {
+            // Asignado, en camino, etc. → ir a tracking
             HapticFeedback.mediumImpact();
-            context.go('/tracking', extra: ride);
+            context.go(AppRoutes.tracking, extra: ride);
           }
+          // RideStatus.requested → seguir esperando, no hacer nada
         });
       },
     );
