@@ -90,6 +90,7 @@ class _RideConfirmationSheetState extends ConsumerState<RideConfirmationSheet>
             _payment == _PaymentMethod.cash ? 'cash' : 'mercado_pago',
       );
       if (!context.mounted) return;
+      ref.invalidate(recentDestinationsProvider);
       Navigator.of(context).pop();
       widget.onRideCreated(ride);
     } catch (e) {

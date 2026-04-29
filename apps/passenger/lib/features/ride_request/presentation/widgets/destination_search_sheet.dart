@@ -7,25 +7,11 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../data/models/destination_result.dart';
+import '../../data/models/geo_utils.dart';
 import '../../data/models/place_prediction.dart';
 import '../../data/ride_providers.dart';
 import '../../data/services/places_service.dart';
 import 'tile_skeleton.dart';
-
-// ---------------------------------------------------------------------------
-// PostGIS WKT parse helper
-// ---------------------------------------------------------------------------
-
-/// Parses a PostGIS geography string such as "SRID=4326;POINT(lng lat)"
-/// into a [LatLng]. Returns null on any parse failure — never throws.
-LatLng? _parseGeoPoint(dynamic val) {
-  if (val == null) return null;
-  final s = val.toString();
-  final m = RegExp(r'POINT\(([^ ]+) ([^)]+)\)').firstMatch(s);
-  if (m == null) return null;
-  // PostGIS stores POINT(longitude latitude)
-  return LatLng(double.parse(m.group(2)!), double.parse(m.group(1)!));
-}
 
 // ---------------------------------------------------------------------------
 // Sheet
@@ -348,7 +334,7 @@ class _FrequentesSection extends StatelessWidget {
             ...filtered.map((r) {
               final addressText = r['address_text'] as String? ?? '';
               final label = r['label'] as String? ?? addressText;
-              final loc = _parseGeoPoint(r['location']);
+              final loc = tryParseGeoPoint(r['location']);
               return _DestinationTile(
                 label: label,
                 address: addressText,
@@ -410,7 +396,7 @@ class _RecientesSection extends StatelessWidget {
             const _SectionHeader('Recientes'),
             ...filtered.map((r) {
               final address = r['dest_address'] as String? ?? '';
-              final loc = _parseGeoPoint(r['dest_location']);
+              final loc = tryParseGeoPoint(r['dest_location']);
               return _DestinationTile(
                 label: address,
                 address: address,
@@ -474,7 +460,7 @@ class _SugerenciasSection extends StatelessWidget {
             ...filtered.map((r) {
               final name = r['name'] as String? ?? '';
               final address = r['address_text'] as String? ?? name;
-              final loc = _parseGeoPoint(r['location']);
+              final loc = tryParseGeoPoint(r['location']);
               return _DestinationTile(
                 label: name,
                 address: address,
