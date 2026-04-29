@@ -87,8 +87,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   style: Theme.of(context).textTheme.bodyLarge,
                   validator: (v) {
-                    if (v == null || v.trim().length < 8) {
-                      return 'Ingresá un número válido';
+                    if (v == null || v.trim().length != 10) {
+                      return 'Ingresá los 10 dígitos de tu número';
                     }
                     return null;
                   },

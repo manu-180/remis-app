@@ -223,14 +223,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _goToMyLocation() async {
     if (_mapController == null) return;
     try {
+      final permResult = await requestLocationPermission();
+      if (!mounted) return;
+      if (permResult == LocationPermissionResult.deniedForever) {
+        showToast(
+          context,
+          RToastData(
+            message: 'Habilitá la ubicación en Ajustes del teléfono',
+            type: RToastType.error,
+          ),
+        );
+        return;
+      }
+      if (permResult == LocationPermissionResult.denied) {
+        showToast(
+          context,
+          RToastData(
+            message: 'Se necesitan permisos de ubicación',
+            type: RToastType.error,
+          ),
+        );
+        return;
+      }
+
       LatLng? target;
 
-      // When shift is active, BackgroundGeolocation has a recent position.
       final bgLoc = await LocationService.getCurrentLocation();
       if (bgLoc != null) {
         target = LatLng(bgLoc.coords.latitude, bgLoc.coords.longitude);
       } else {
-        // Fallback: use geolocator directly (works before shift starts).
         final pos = await getCurrentPositionOrNull();
         if (pos != null) {
           target = LatLng(pos.latitude, pos.longitude);

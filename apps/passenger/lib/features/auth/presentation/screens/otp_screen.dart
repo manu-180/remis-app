@@ -50,20 +50,25 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         client: client,
       );
       if (!mounted) return;
-      // Check if passenger profile exists
-      final user = client.auth.currentUser;
-      if (user != null) {
-        final profile = await client
-            .from('passengers')
-            .select('id')
-            .eq('user_id', user.id)
-            .maybeSingle();
-        if (!mounted) return;
-        if (profile == null) {
-          context.go(AppRoutes.onboardingName);
-        } else {
-          context.go(AppRoutes.home);
+      // OTP verified — now check if passenger profile exists
+      try {
+        final user = client.auth.currentUser;
+        if (user != null) {
+          final profile = await client
+              .from('passengers')
+              .select('id')
+              .eq('user_id', user.id)
+              .maybeSingle();
+          if (!mounted) return;
+          if (profile == null) {
+            context.go(AppRoutes.onboardingName);
+          } else {
+            context.go(AppRoutes.home);
+          }
         }
+      } catch (_) {
+        if (!mounted) return;
+        context.go(AppRoutes.onboardingName);
       }
     } on AuthException catch (e) {
       setState(() => _error = 'Código incorrecto — ${e.message}');
