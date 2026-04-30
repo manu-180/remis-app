@@ -17,7 +17,7 @@ Future<void> main() async {
       options.tracesSampleRate = Env.isProd ? 0.1 : 1.0;
       options.profilesSampleRate = 0.1;
       options.environment = Env.environment;
-      options.release = 'remis-passenger@1.0.0+1';
+      options.release = 'remis-passenger@1.0.1+2';
       options.enableAutoSessionTracking = true;
       options.beforeSend = (event, hint) {
         if (event.user != null) {

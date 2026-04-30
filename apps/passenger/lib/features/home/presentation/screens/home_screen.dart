@@ -85,6 +85,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _fetchCurrentLocation() async {
     setState(() => _loadingLocation = true);
+
+    // 1) Last-known position primero — instantáneo, evita pantalla muerta
+    //    en la PRIMERA instalación mientras el GPS hace cold start.
+    try {
+      final last = await Geolocator.getLastKnownPosition();
+      if (mounted && last != null && _pickupLocation == null) {
+        final ll = LatLng(last.latitude, last.longitude);
+        setState(() => _pickupLocation = ll);
+        _mapController?.animateCamera(
+          CameraUpdate.newLatLngZoom(ll, 15.5),
+        );
+      }
+    } catch (_) {/* ignoramos: vamos a intentar getCurrentPosition */}
+
+    // 2) Fix fresco con timeout (ver geolocator_provider.dart).
     final pos = await getCurrentPositionOrNull();
     if (!mounted) return;
     setState(() {
@@ -171,8 +186,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _onDestinationSelected(DestinationResult dest) async {
-    final pickup = _pickupLocation;
-    if (pickup == null) return;
+    var pickup = _pickupLocation;
+
+    // Primera instalación: el permiso recién se otorgó y getCurrentPosition
+    // todavía no terminó. Antes se hacía `return` silencioso → el destino
+    // nunca aparecía en el mapa, no había ruta ni tarifa, y solo cerrar y
+    // reabrir lo arreglaba (porque ahí el GPS ya estaba caliente).
+    if (pickup == null) {
+      try {
+        final last = await Geolocator.getLastKnownPosition();
+        if (last != null) {
+          pickup = LatLng(last.latitude, last.longitude);
+          if (mounted) setState(() => _pickupLocation = pickup);
+        }
+      } catch (_) {/* sigue null → snackbar abajo */}
+    }
+
+    if (pickup == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No pudimos detectar tu ubicación. Tocá el mapa para fijar el origen.',
+          ),
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _destination = dest;
@@ -414,8 +454,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               pickupAddress: 'Mi ubicación',
               destinationLabel: _destination?.label,
               destinationAddress: _destination?.address,
-              onSearchTap:
-                  _pickupLocation != null ? _openDestinationSearch : () {},
+              // Siempre abrimos el sheet — si todavía no hay pickup,
+              // _onDestinationSelected reintenta con getLastKnownPosition
+              // y muestra un snackbar accionable si tampoco se obtiene.
+              onSearchTap: _openDestinationSearch,
               onClearDestination: _clearDestination,
               onConfirm: _confirmDestination,
               confirmLoading: _confirmingDestination,

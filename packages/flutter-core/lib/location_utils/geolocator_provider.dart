@@ -16,13 +16,22 @@ Stream<Position> livePosition(Ref ref) {
 }
 
 Future<Position?> getCurrentPositionOrNull() async {
+  // Sin timeLimit, en Android la primera lectura tras un permiso recién
+  // otorgado puede colgarse esperando el primer fix de GPS (cold start).
+  // 15 s es suficiente para indoor + warm-up; si vence devolvemos null y el
+  // caller hace fallback a getLastKnownPosition.
   try {
     return await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 15),
       ),
     );
   } catch (_) {
-    return null;
+    try {
+      return await Geolocator.getLastKnownPosition();
+    } catch (_) {
+      return null;
+    }
   }
 }
