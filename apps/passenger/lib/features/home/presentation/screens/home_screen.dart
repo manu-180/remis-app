@@ -32,7 +32,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   GoogleMapController? _mapController;
   LatLng? _pickupLocation;
   bool _locationPermissionGranted = false;
-  bool _showDisclosure = true;
+  // Arranca en false: el mapa entra al árbol desde el primer frame.
+  // Solo se pone true si detectamos que el permiso no fue otorgado aún.
+  bool _showDisclosure = false;
   bool _loadingLocation = false;
   bool _mapReady = false;
 
@@ -52,13 +54,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _checkExistingPermission() async {
     final permission = await Geolocator.checkPermission();
+    if (!mounted) return;
     if (permission == LocationPermission.always ||
         permission == LocationPermission.whileInUse) {
-      setState(() {
-        _showDisclosure = false;
-        _locationPermissionGranted = true;
-      });
+      setState(() => _locationPermissionGranted = true);
       _fetchCurrentLocation();
+    } else {
+      // No hay permiso previo: mostrar disclosure sobre el mapa ya cargando.
+      setState(() => _showDisclosure = true);
     }
   }
 
@@ -280,14 +283,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Show prominent disclosure BEFORE requesting OS permission
-    if (_showDisclosure) {
-      return LocationDisclosureScreen(
-        onContinue: _onDisclosureContinue,
-        onDismiss: _onDisclosureDismiss,
-      );
-    }
-
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final user = ref.watch(currentUserProvider);
     final displayName = user?.userMetadata?['full_name'] as String? ?? 'vos';
@@ -426,6 +421,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               confirmLoading: _confirmingDestination,
             ),
           ),
+
+          // ── Disclosure de ubicación como overlay (encima del mapa) ──
+          // El mapa ya está cargando detrás; esto evita bloquear su init.
+          if (_showDisclosure)
+            LocationDisclosureScreen(
+              onContinue: _onDisclosureContinue,
+              onDismiss: _onDisclosureDismiss,
+            ),
         ],
       ),
     );
