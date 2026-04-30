@@ -23,8 +23,14 @@ export function useSosCount(): number {
 
     void fetchCount();
 
+    // Unique channel name per hook instance: a singleton Supabase client
+    // returns the EXISTING channel when the same name is reused, which causes
+    // `cannot add postgres_changes callbacks ... after subscribe()` on remount
+    // (Strict Mode, SSR→CSR hydration, route transitions).
+    const channelName = `admin-sos-count-${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`;
+
     const channel = supabase
-      .channel('admin-sos-count')
+      .channel(channelName)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'sos_events' },

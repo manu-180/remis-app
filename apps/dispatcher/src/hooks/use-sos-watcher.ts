@@ -53,8 +53,11 @@ export function useSosWatcher() {
       }
     })();
 
+    // Unique channel name per hook instance — see note in use-sos-count.ts.
+    const channelName = `sos-watcher-${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`;
+
     const channel = supabase
-      .channel('sos-watcher')
+      .channel(channelName)
       .on(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         'postgres_changes' as any,
