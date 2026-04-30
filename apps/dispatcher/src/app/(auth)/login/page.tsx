@@ -27,6 +27,13 @@ export default function LoginPage() {
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
 
+  // MFA challenge state
+  const [mfaOpen, setMfaOpen] = useState(false);
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaError, setMfaError] = useState('');
+  const [mfaLoading, setMfaLoading] = useState(false);
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setResetLoading(true);
@@ -46,6 +53,26 @@ export default function LoginPage() {
     }
   };
 
+  async function redirectByRole(userId: string) {
+    const supabase = getSupabaseBrowserClient();
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single() as { data: { role: string } | null; error: unknown };
+
+    if (!profile || !['dispatcher', 'admin'].includes(profile.role)) {
+      await supabase.auth.signOut();
+      throw new Error('No tenés permisos para acceder al panel.');
+    }
+
+    if (profile.role === 'admin') {
+      router.push('/admin');
+    } else {
+      router.push('/');
+    }
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -57,27 +84,69 @@ export default function LoginPage() {
 
       if (signInError) throw signInError;
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.user.id)
-        .single() as { data: { role: string } | null; error: unknown };
-
-      if (!profile || !['dispatcher', 'admin'].includes(profile.role)) {
-        await supabase.auth.signOut();
-        throw new Error('No tenés permisos para acceder al panel.');
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aal?.currentLevel === 'aal1' && aal.nextLevel === 'aal2') {
+        setPendingUserId(data.user.id);
+        setMfaCode('');
+        setMfaError('');
+        setMfaOpen(true);
+        return;
       }
 
-      if (profile.role === 'admin') {
-        router.push('/admin');
-      } else {
-        router.push('/');
-      }
+      await redirectByRole(data.user.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al iniciar sesión. Verificá tus credenciales.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleMfaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (mfaCode.length !== 6 || !pendingUserId) return;
+    setMfaLoading(true);
+    setMfaError('');
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { data: factors, error: factorsErr } = await supabase.auth.mfa.listFactors();
+      if (factorsErr) throw factorsErr;
+      const totp = factors?.totp?.[0];
+      if (!totp) {
+        setMfaError('No se encontró un factor 2FA configurado.');
+        return;
+      }
+
+      const { data: challenge, error: challengeErr } = await supabase.auth.mfa.challenge({
+        factorId: totp.id,
+      });
+      if (challengeErr || !challenge) throw challengeErr ?? new Error('challenge failed');
+
+      const { error: verifyErr } = await supabase.auth.mfa.verify({
+        factorId: totp.id,
+        challengeId: challenge.id,
+        code: mfaCode,
+      });
+      if (verifyErr) {
+        setMfaError('Código incorrecto');
+        return;
+      }
+
+      setMfaOpen(false);
+      await redirectByRole(pendingUserId);
+    } catch (err) {
+      setMfaError(err instanceof Error ? err.message : 'No se pudo verificar el código.');
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const handleMfaCancel = async () => {
+    const supabase = getSupabaseBrowserClient();
+    await supabase.auth.signOut();
+    setMfaOpen(false);
+    setMfaCode('');
+    setMfaError('');
+    setPendingUserId(null);
   };
 
   return (
@@ -186,6 +255,64 @@ export default function LoginPage() {
               </Button>
               <Button type="submit" variant="primary" disabled={resetLoading || !resetEmail}>
                 {resetLoading ? 'Enviando…' : 'Enviar email'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={mfaOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            void handleMfaCancel();
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Autenticación en dos pasos</DialogTitle>
+            <DialogDescription>
+              Ingresá el código de 6 dígitos que aparece en tu app de autenticación.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleMfaSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="mfa_code">Código</Label>
+              <Input
+                id="mfa_code"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                placeholder="123456"
+                value={mfaCode}
+                onChange={(e) => {
+                  setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                  if (mfaError) setMfaError('');
+                }}
+                autoComplete="one-time-code"
+                required
+                autoFocus
+              />
+              {mfaError && (
+                <p className="text-[var(--text-sm)] text-[var(--danger)] mt-1">{mfaError}</p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleMfaCancel}
+                disabled={mfaLoading}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={mfaLoading || mfaCode.length !== 6}
+              >
+                {mfaLoading ? 'Verificando…' : 'Verificar'}
               </Button>
             </DialogFooter>
           </form>
