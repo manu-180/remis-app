@@ -2,14 +2,27 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Plus, Search, ScrollText } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Drawer } from '@/components/ui/drawer';
-import { ScrollText } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Select } from '@/components/ui/select';
+import { toast } from '@/components/ui/use-toast';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,6 +44,8 @@ type AuditEntry = {
   created_at: string;
 };
 
+type EnabledFilter = 'all' | 'enabled' | 'disabled';
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -45,8 +60,10 @@ function relativeTime(isoString: string): string {
   return `hace ${days} día${days !== 1 ? 's' : ''}`;
 }
 
+const KEY_REGEX = /^[a-z0-9_]+$/;
+
 // ---------------------------------------------------------------------------
-// History Drawer content
+// History Drawer
 // ---------------------------------------------------------------------------
 interface HistoryDrawerProps {
   flagKey: string;
@@ -82,11 +99,9 @@ function HistoryDrawer({ flagKey, open, onOpenChange }: HistoryDrawerProps) {
         </div>
       ) : (
         <div className="relative pl-6 space-y-4">
-          {/* vertical line */}
           <div className="absolute left-2 top-0 bottom-0 w-0.5 bg-[var(--neutral-200)]" />
           {history.map((entry) => (
             <div key={entry.created_at} className="relative">
-              {/* dot */}
               <div className="absolute -left-4 top-1.5 w-2 h-2 rounded-full bg-[var(--brand)]" />
               <p className="text-xs text-[var(--neutral-500)]">{relativeTime(entry.created_at)}</p>
               <p className="text-sm text-[var(--neutral-700)]">
@@ -152,7 +167,6 @@ function FlagCard({ flag, onToggle, onDescriptionSave }: FlagCardProps) {
     <>
       <Card className={borderClass}>
         <CardContent className="pt-6 space-y-3">
-          {/* Header row: key + switch */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               <span
@@ -166,20 +180,20 @@ function FlagCard({ flag, onToggle, onDescriptionSave }: FlagCardProps) {
             <Switch
               checked={flag.enabled}
               onCheckedChange={(val) => onToggle(flag.key, val)}
-              aria-label={`Toggle ${flag.key}`}
+              aria-label={`Activar o desactivar ${flag.key}`}
             />
           </div>
 
-          {/* Description — inline edit on double click */}
           {editing ? (
             <input
               ref={inputRef}
-              className="w-full text-sm text-[var(--neutral-700)] bg-[var(--neutral-50)] border border-[var(--neutral-300)] rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              className="w-full text-sm text-[var(--neutral-700)] bg-[var(--neutral-50)] border border-[var(--neutral-300)] rounded px-2 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
               value={draftDesc}
               onChange={(e) => setDraftDesc(e.target.value)}
               onBlur={commitEdit}
               onKeyDown={handleKeyDown}
               placeholder="Agregar descripción..."
+              aria-label={`Descripción de ${flag.key}`}
             />
           ) : (
             <p
@@ -191,7 +205,6 @@ function FlagCard({ flag, onToggle, onDescriptionSave }: FlagCardProps) {
             </p>
           )}
 
-          {/* Footer row: timestamp + history button */}
           <div className="flex items-center justify-between pt-1">
             <span className="text-xs text-[var(--neutral-400)]">
               Actualizado: {relativeTime(flag.updated_at)}
@@ -201,6 +214,7 @@ function FlagCard({ flag, onToggle, onDescriptionSave }: FlagCardProps) {
               size="sm"
               onClick={() => setHistoryOpen(true)}
               className="flex items-center gap-1.5 text-xs text-[var(--neutral-500)] hover:text-[var(--neutral-700)]"
+              aria-label={`Ver historial de ${flag.key}`}
             >
               <ScrollText size={13} />
               Historial
@@ -240,10 +254,165 @@ function SkeletonCards() {
 }
 
 // ---------------------------------------------------------------------------
+// Create Flag Dialog
+// ---------------------------------------------------------------------------
+interface CreateFlagDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  existingKeys: Set<string>;
+  onCreated: (flag: FeatureFlag) => void;
+}
+
+function CreateFlagDialog({
+  open,
+  onOpenChange,
+  existingKeys,
+  onCreated,
+}: CreateFlagDialogProps) {
+  const [key, setKey] = useState('');
+  const [description, setDescription] = useState('');
+  const [enabled, setEnabled] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [keyError, setKeyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setKey('');
+      setDescription('');
+      setEnabled(false);
+      setKeyError(null);
+      setSubmitting(false);
+    }
+  }, [open]);
+
+  function validateKey(value: string): string | null {
+    const trimmed = value.trim();
+    if (!trimmed) return 'El nombre es requerido.';
+    if (!KEY_REGEX.test(trimmed)) {
+      return 'Usá solo minúsculas, números y guion bajo (snake_case).';
+    }
+    if (existingKeys.has(trimmed)) {
+      return 'Ya existe un flag con este nombre.';
+    }
+    return null;
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const err = validateKey(key);
+    if (err) {
+      setKeyError(err);
+      return;
+    }
+    setSubmitting(true);
+    const supabase = getSupabaseBrowserClient();
+    const trimmedDesc = description.trim();
+    const insertResult = await (supabase as any)
+      .from('feature_flags')
+      .insert({
+        key: key.trim(),
+        enabled,
+        description: trimmedDesc.length > 0 ? trimmedDesc : null,
+      })
+      .select('*')
+      .single();
+
+    setSubmitting(false);
+
+    if (insertResult.error) {
+      toast.error(`No pudimos crear el flag: ${insertResult.error.message}`);
+      return;
+    }
+
+    toast.success(`Flag "${key.trim()}" creado.`);
+    onCreated(insertResult.data as FeatureFlag);
+    onOpenChange(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md bg-[var(--neutral-0)] border-[var(--neutral-200)]">
+        <DialogHeader>
+          <DialogTitle className="text-[var(--neutral-900)]">Crear nuevo flag</DialogTitle>
+          <DialogDescription className="text-[var(--neutral-600)]">
+            Definí un nombre interno (snake_case) y una descripción corta. Empieza desactivado por defecto.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="flag-key">Nombre interno</Label>
+            <Input
+              id="flag-key"
+              value={key}
+              onChange={(e) => {
+                setKey(e.target.value);
+                if (keyError) setKeyError(validateKey(e.target.value));
+              }}
+              placeholder="ej. nueva_landing_drivers"
+              autoFocus
+              className="font-mono"
+              aria-invalid={!!keyError}
+              aria-describedby={keyError ? 'flag-key-error' : undefined}
+            />
+            {keyError && (
+              <p id="flag-key-error" className="text-xs text-[var(--danger)]">
+                {keyError}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="flag-description">Descripción</Label>
+            <Textarea
+              id="flag-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Para qué sirve este flag..."
+              rows={3}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="flag-initial">Estado inicial</Label>
+            <Select
+              id="flag-initial"
+              value={enabled ? 'enabled' : 'disabled'}
+              onValueChange={(v) => setEnabled(v === 'enabled')}
+              options={[
+                { value: 'disabled', label: 'Desactivado' },
+                { value: 'enabled', label: 'Activado' },
+              ]}
+            />
+          </div>
+
+          <DialogFooter className="mt-2 gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => onOpenChange(false)}
+              disabled={submitting}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" variant="primary" disabled={submitting} className="min-w-[100px]">
+              {submitting ? 'Creando...' : 'Crear flag'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main client component
 // ---------------------------------------------------------------------------
 export function FeatureFlagsClient() {
   const [flags, setFlags] = useState<FeatureFlag[] | null>(null);
+  const [search, setSearch] = useState('');
+  const [enabledFilter, setEnabledFilter] = useState<EnabledFilter>('all');
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -256,8 +425,27 @@ export function FeatureFlagsClient() {
       });
   }, []);
 
+  const existingKeys = useMemo(
+    () => new Set((flags ?? []).map((f) => f.key)),
+    [flags],
+  );
+
+  const filteredFlags = useMemo(() => {
+    if (!flags) return null;
+    const q = search.trim().toLowerCase();
+    return flags.filter((f) => {
+      if (enabledFilter === 'enabled' && !f.enabled) return false;
+      if (enabledFilter === 'disabled' && f.enabled) return false;
+      if (q) {
+        const inKey = f.key.toLowerCase().includes(q);
+        const inDesc = (f.description ?? '').toLowerCase().includes(q);
+        if (!inKey && !inDesc) return false;
+      }
+      return true;
+    });
+  }, [flags, search, enabledFilter]);
+
   async function handleToggle(key: string, newEnabled: boolean) {
-    // Optimistic update
     setFlags((prev) =>
       prev
         ? prev.map((f) =>
@@ -273,14 +461,12 @@ export function FeatureFlagsClient() {
       .eq('key', key);
 
     if (error) {
-      // Revert on failure
       setFlags((prev) =>
         prev
-          ? prev.map((f) =>
-              f.key === key ? { ...f, enabled: !newEnabled } : f,
-            )
+          ? prev.map((f) => (f.key === key ? { ...f, enabled: !newEnabled } : f))
           : prev,
       );
+      toast.error('No pudimos actualizar el flag. Reintentá en unos segundos.');
     }
   }
 
@@ -296,32 +482,99 @@ export function FeatureFlagsClient() {
       .eq('key', key);
   }
 
+  function handleCreated(flag: FeatureFlag) {
+    setFlags((prev) =>
+      prev ? [...prev, flag].sort((a, b) => a.key.localeCompare(b.key)) : [flag],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Toolbar (search + filter + create) — siempre visible aunque la lista esté vacía
+  // ---------------------------------------------------------------------------
+  const toolbar = (
+    <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+      <div className="flex flex-col sm:flex-row gap-3 flex-1 min-w-0">
+        <div className="relative flex-1 max-w-md">
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--neutral-400)] pointer-events-none"
+          />
+          <Input
+            type="search"
+            placeholder="Buscar por nombre o descripción..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+            aria-label="Buscar flag"
+          />
+        </div>
+        <Select
+          value={enabledFilter}
+          onValueChange={(v) => setEnabledFilter(v as EnabledFilter)}
+          className="w-full sm:w-[180px]"
+          options={[
+            { value: 'all', label: 'Todos' },
+            { value: 'enabled', label: 'Activados' },
+            { value: 'disabled', label: 'Desactivados' },
+          ]}
+        />
+      </div>
+      <Button variant="primary" onClick={() => setCreateOpen(true)} className="shrink-0">
+        <Plus size={16} className="mr-1.5" />
+        Crear nuevo flag
+      </Button>
+    </div>
+  );
+
   if (flags === null) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        <SkeletonCards />
+      <div className="space-y-4">
+        {toolbar}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <SkeletonCards />
+        </div>
       </div>
     );
   }
 
-  if (flags.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <p className="text-sm text-[var(--neutral-500)]">No hay feature flags configurados.</p>
-      </div>
-    );
-  }
+  const hasFlags = flags.length > 0;
+  const visible = filteredFlags ?? [];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-      {flags.map((flag) => (
-        <FlagCard
-          key={flag.key}
-          flag={flag}
-          onToggle={handleToggle}
-          onDescriptionSave={handleDescriptionSave}
-        />
-      ))}
+    <div className="space-y-4">
+      {toolbar}
+
+      {!hasFlags ? (
+        <Card>
+          <CardContent className="py-16 text-center text-sm text-[var(--neutral-500)]">
+            Aún no hay feature flags configurados. Creá el primero con el botón de arriba.
+          </CardContent>
+        </Card>
+      ) : visible.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-sm text-[var(--neutral-500)]">
+            No hay flags que coincidan con los filtros.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {visible.map((flag) => (
+            <FlagCard
+              key={flag.key}
+              flag={flag}
+              onToggle={handleToggle}
+              onDescriptionSave={handleDescriptionSave}
+            />
+          ))}
+        </div>
+      )}
+
+      <CreateFlagDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        existingKeys={existingKeys}
+        onCreated={handleCreated}
+      />
     </div>
   );
 }

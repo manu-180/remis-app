@@ -9,6 +9,8 @@ import { useRealtimeTable } from '@/hooks/use-realtime-table';
 import { useExportCsv } from '@/hooks/use-export-csv';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { escapeOrFilter } from '@/lib/postgrest-safe';
+import { useConfirm } from '@/components/admin/confirm-dialog';
+import { toast } from '@/components/ui/use-toast';
 import {
   DataTable,
   FilterBar,
@@ -84,6 +86,7 @@ const PAGE_SIZE = 25;
 
 export function DriversListClient() {
   const router = useRouter();
+  const confirm = useConfirm();
   const [filters, setFilters] = useState<Record<string, unknown>>({ q: '', status: [] as string[] });
   const [page, setPage] = useState(1);
   const [newDrawerOpen, setNewDrawerOpen] = useState(false);
@@ -303,13 +306,27 @@ export function DriversListClient() {
         icon: <Ban size={14} />,
         label: 'Suspender',
         onClick: async (row) => {
-          const { getSupabaseBrowserClient } = await import('@/lib/supabase/client');
+          const name = row.profiles?.full_name ?? 'este conductor';
+          const ok = await confirm({
+            title: '¿Suspender al conductor?',
+            description: `${name} va a quedar inactivo y deja de aparecer disponible para asignaciones. Podés reactivarlo desde su perfil cuando quieras.`,
+            confirmLabel: 'Suspender',
+            cancelLabel: 'Cancelar',
+            danger: true,
+          });
+          if (!ok) return;
+
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const sb = getSupabaseBrowserClient() as any;
-          await sb
+          const { error } = await sb
             .from('drivers')
             .update({ current_status: 'suspended', is_active: false })
             .eq('id', row.id);
+          if (error) {
+            toast.error('No pudimos suspender al conductor. Reintentá en unos segundos.');
+            return;
+          }
+          toast.success(`${name} fue suspendido.`);
           refetch();
         },
         danger: true,

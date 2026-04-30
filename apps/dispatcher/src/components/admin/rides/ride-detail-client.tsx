@@ -356,7 +356,7 @@ function CancelDialog({
             'w-full rounded-[var(--radius-md)] border border-[var(--neutral-300)]',
             'bg-[var(--neutral-0)] text-[var(--neutral-900)] text-sm',
             'px-3 py-2 placeholder:text-[var(--neutral-400)]',
-            'focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/50 focus:border-[var(--brand-primary)]',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/50 focus-visible:border-[var(--brand-primary)]',
             'resize-none',
           )}
           rows={4}
@@ -557,7 +557,7 @@ function ReassignDialog({
             'w-full rounded-[var(--radius-md)] border border-[var(--neutral-300)]',
             'bg-[var(--neutral-0)] text-[var(--neutral-900)] text-sm',
             'px-3 py-2 placeholder:text-[var(--neutral-400)]',
-            'focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/50 focus:border-[var(--brand-primary)]',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/50 focus-visible:border-[var(--brand-primary)]',
             'resize-none',
           )}
           rows={2}
@@ -898,7 +898,7 @@ function MessagesThread({
                 'flex-1 rounded-[var(--radius-md)] border border-[var(--neutral-300)]',
                 'bg-[var(--neutral-0)] text-[var(--neutral-900)] text-sm',
                 'px-3 py-2 placeholder:text-[var(--neutral-400)]',
-                'focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/50 focus:border-[var(--brand-primary)]',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/50 focus-visible:border-[var(--brand-primary)]',
                 'resize-none',
               )}
               rows={2}
@@ -1212,7 +1212,7 @@ export function RideDetailClient({ rideId }: { rideId: string }) {
           {driverPid ? (
             <Link
               href={`/admin/drivers/${driverPid}`}
-              className="block rounded-[var(--radius-lg)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/50"
+              className="block rounded-[var(--radius-lg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/50"
             >
               <Card className="cursor-pointer transition-colors hover:bg-[var(--neutral-50)]">
                 <CardHeader className="pb-3">
@@ -1273,7 +1273,7 @@ export function RideDetailClient({ rideId }: { rideId: string }) {
           {ride.drivers?.vehicles && driverPid && (
             <Link
               href={`/admin/drivers/${driverPid}?tab=vehicle`}
-              className="block rounded-[var(--radius-lg)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/50"
+              className="block rounded-[var(--radius-lg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/50"
             >
               <Card className="cursor-pointer transition-colors hover:bg-[var(--neutral-50)]">
                 <CardHeader className="pb-3">

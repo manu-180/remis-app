@@ -1,9 +1,8 @@
 'use client';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 import { useState, useCallback } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ChevronDown, ChevronUp, Check, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Check, X, ImageOff } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useSupabaseQuery } from '@/hooks/use-supabase-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -208,23 +207,14 @@ function PendingCard({ row, onResolved }: PendingCardProps) {
           </div>
         )}
 
-        {/* Photo placeholders */}
-        <div className="flex gap-3">
-          <div>
-            <p className="text-xs text-[var(--neutral-500)] mb-1">Foto documento</p>
-            <div className="group relative w-[120px] h-[80px] bg-[var(--neutral-100)] rounded overflow-hidden cursor-zoom-in">
-              <div className="absolute inset-0 flex items-center justify-center text-xs text-[var(--neutral-400)]">
-                Foto documento
-              </div>
-            </div>
-          </div>
-          <div>
-            <p className="text-xs text-[var(--neutral-500)] mb-1">Foto selfie</p>
-            <div className="group relative w-[120px] h-[80px] bg-[var(--neutral-100)] rounded overflow-hidden cursor-zoom-in">
-              <div className="absolute inset-0 flex items-center justify-center text-xs text-[var(--neutral-400)]">
-                Foto selfie
-              </div>
-            </div>
+        {/* Photo placeholders — provider-specific empty state when no images */}
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs text-[var(--neutral-500)]">Imágenes</p>
+          <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-dashed border-[var(--neutral-200)] bg-[var(--neutral-50)] px-3 py-2.5">
+            <ImageOff size={16} className="shrink-0 text-[var(--neutral-400)]" />
+            <p className="text-xs leading-snug text-[var(--neutral-500)]">
+              No hay foto disponible. El proveedor ({providerLabel(row.provider)}) no expone imágenes en este registro.
+            </p>
           </div>
         </div>
 

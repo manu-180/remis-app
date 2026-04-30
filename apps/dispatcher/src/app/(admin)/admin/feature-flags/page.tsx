@@ -1,5 +1,5 @@
 import { PageHeader } from '@/components/admin/page-header';
-import { Card, CardContent } from '@/components/ui/card';
+import { FeatureFlagsClient } from '@/components/admin/feature-flags/feature-flags-client';
 
 export default function AdminFeatureFlagsPage() {
   return (
@@ -8,11 +8,7 @@ export default function AdminFeatureFlagsPage() {
         title="Feature Flags"
         description="Activación y desactivación de funcionalidades por entorno."
       />
-      <Card>
-        <CardContent className="py-12 text-center text-sm text-[var(--neutral-500)]">
-          En construcción
-        </CardContent>
-      </Card>
+      <FeatureFlagsClient />
     </div>
   );
 }

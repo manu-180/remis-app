@@ -214,7 +214,7 @@ function UploadDrawer({ open, onOpenChange, driverId, documentType, existingDoc,
             type="date"
             value={issuedAt}
             onChange={(e) => setIssuedAt(e.target.value)}
-            className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--neutral-300)] bg-[var(--neutral-0)] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:border-[var(--brand-primary)]"
+            className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--neutral-300)] bg-[var(--neutral-0)] px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:border-[var(--brand-primary)]"
           />
         </div>
 
@@ -226,7 +226,7 @@ function UploadDrawer({ open, onOpenChange, driverId, documentType, existingDoc,
             type="date"
             value={expiresAt}
             onChange={(e) => setExpiresAt(e.target.value)}
-            className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--neutral-300)] bg-[var(--neutral-0)] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:border-[var(--brand-primary)]"
+            className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--neutral-300)] bg-[var(--neutral-0)] px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:border-[var(--brand-primary)]"
           />
         </div>
       </div>

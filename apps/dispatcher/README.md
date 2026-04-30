@@ -1,32 +1,33 @@
 # dispatcher — Panel Admin + Despacho Live
 
-Aplicación Next.js para el panel de administración y despacho en tiempo real de RemisDespacho.
+Aplicación Next.js para el panel de administración y despacho en tiempo real.
 
 ## Stack
 
-- **Framework**: Next.js 15 (App Router)
-- **UI**: React 19, Tailwind CSS v4, shadcn/ui components
+- **Framework**: Next.js 15 (App Router) + React 19
+- **UI**: Tailwind CSS v4 + tokens en `src/app/globals.css`
 - **Estado**: Zustand
-- **Backend**: Supabase (PostgreSQL + Realtime + Auth + Storage)
-- **Mapas**: MapLibre GL JS via react-map-gl v8
+- **Backend**: Supabase (Postgres + PostGIS + Realtime + Auth + Edge Functions)
+- **Mapas**: MapLibre GL JS (web), Google Maps (mobile)
+- **Observabilidad**: Sentry + PostHog (con masking de PII en admin)
 
 ## Desarrollo
 
 ### Requisitos
+
 - Node.js 20+
 - pnpm 9+
 
 ### Configuración inicial
 
-1. Copiar variables de entorno desde la raíz del monorepo:
-   ```bash
-   # Desde la raíz del monorepo
-   pnpm env:sync
-   ```
+Variables de entorno en la raíz del monorepo. Sincronizar derivados:
 
-2. El archivo `.env.local` en `apps/dispatcher/` se genera automáticamente con:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+```bash
+# Desde la raíz del monorepo
+pnpm env:sync
+```
+
+El archivo `apps/dispatcher/.env.local` se genera automáticamente con las variables `NEXT_PUBLIC_SUPABASE_*` y demás secrets.
 
 ### Correr en desarrollo
 
@@ -34,65 +35,80 @@ Aplicación Next.js para el panel de administración y despacho en tiempo real d
 # Desde la raíz del monorepo
 pnpm dev
 
-# O desde apps/dispatcher
-pnpm dev
+# O sólo dispatcher
+pnpm --filter dispatcher dev
 ```
 
-La app corre en **http://localhost:3001**
+La app corre en **http://localhost:3001**.
 
-## Crear usuario admin (SQL)
+### Seed de demo
 
-Ejecutar en Supabase SQL Editor:
+Para una demo realista (12 conductores, 50+ viajes, KYC pendientes, pagos, SOS, etc.) usar el seed dedicado:
 
-```sql
--- 1. Crear usuario en Auth (desde Supabase Dashboard → Auth → Users → Invite user)
-
--- 2. Asignar rol admin
-UPDATE profiles 
-SET role = 'admin' 
-WHERE email = 'tu@email.com';
+```bash
+# Aplicar seed contra la DB local de Supabase
+psql "$DATABASE_URL" -f docs/seeds/demo-seed.sql
 ```
 
-## Páginas del admin
+Para más detalles ver [docs/seeds/demo-seed.sql](../../docs/seeds/demo-seed.sql).
 
-| URL | Descripción |
-|-----|-------------|
-| `/admin` | Dashboard con KPIs y heatmap |
-| `/admin/drivers` | Gestión de conductores |
-| `/admin/drivers/[id]` | Perfil detallado de conductor |
-| `/admin/rides` | Lista y búsqueda de viajes |
-| `/admin/rides/[id]` | Detalle de viaje con mapa de ruta |
-| `/admin/sos` | Alertas SOS activas |
-| `/admin/sos/[id]` | Detalle de alerta SOS |
-| `/admin/passengers` | Gestión de pasajeros |
-| `/admin/payments` | Pagos y webhooks MercadoPago |
-| `/admin/zones` | Editor de zonas tarifarias (MapLibre) |
-| `/admin/fares` | Matriz de tarifas y simulador |
-| `/admin/kyc` | Cola de revisión KYC |
-| `/admin/feature-flags` | Activar/desactivar features |
-| `/admin/audit` | Audit log con hash chain |
-| `/admin/team` | Gestión de equipo admin/dispatcher |
-| `/admin/settings` | Configuración de la organización |
-| `/shared/[token]` | Vista pública de viaje compartido (sin auth) |
+### Credenciales de demo
+
+| Rol | Email | Password |
+|-----|-------|----------|
+| Admin | `admin@demo.local` | `demo1234` |
+| Dispatcher | `dispatcher@demo.local` | `demo1234` |
+
+> Cambiar las contraseñas antes de cualquier ambiente compartido. Las credenciales reales del cliente nunca van al repo.
+
+## Páginas implementadas
+
+| URL | Descripción | Estado |
+|-----|-------------|--------|
+| `/admin` | Dashboard con KPIs, heatmap y períodos clickeables | ✅ |
+| `/admin/drivers` | Lista de conductores con filtros + CSV | ✅ |
+| `/admin/drivers/[id]` | Perfil detallado: docs, KYC, viajes, suspender | ✅ |
+| `/admin/rides` | Lista y búsqueda de viajes + KPIs | ✅ |
+| `/admin/rides/[id]` | Detalle: reasignar, compartir, mensajes, mapa | ✅ |
+| `/admin/sos` | Mapa con activos en realtime + acciones | ✅ |
+| `/admin/sos/[id]` | Detalle de alerta con resolución | ✅ |
+| `/admin/passengers` | Gestión de pasajeros + CSV | ✅ |
+| `/admin/payments` | Pagos + webhooks MP + refund (simulado) | ✅ |
+| `/admin/zones` | Editor de zonas tarifarias (MapLibre) | ✅ |
+| `/admin/fares` | Matriz de tarifas y simulador | ✅ |
+| `/admin/kyc` | Cola de revisión KYC con aprobación inline | ✅ |
+| `/admin/feature-flags` | Toggle, búsqueda, filtro, crear nuevo flag | ✅ |
+| `/admin/audit` | Audit log + verificación de hash chain on-demand | ✅ |
+| `/admin/team` | Gestión equipo admin/dispatcher + invite real | ✅ |
+| `/admin/settings` | Cuenta, password, 2FA TOTP, organización | ✅ |
+| `/shared/[token]` | Vista pública de viaje compartido (sin auth) | ✅ |
 
 ## Tests
 
 ```bash
-# E2E con Playwright
-pnpm test:e2e
+# Todos los E2E (Playwright)
+pnpm --filter dispatcher test:e2e
 
-# Con UI interactiva
-pnpm exec playwright test --ui
+# UI interactiva
+pnpm --filter dispatcher test:e2e:ui
+
+# Sólo a11y (axe-core)
+pnpm --filter dispatcher test:e2e a11y
+
+# Type check + lint
+pnpm --filter dispatcher typecheck
+pnpm --filter dispatcher lint
 ```
 
-Los tests viven en `apps/dispatcher/e2e/`.
+Los tests viven en [tests/e2e/](tests/e2e/). El test de a11y (`a11y.spec.ts`) corre axe-core sobre cada página del admin y falla si aparece alguna violación con `impact: critical`.
 
-## Variables de entorno requeridas
+### Variables E2E
 
 | Variable | Descripción |
 |----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto Supabase |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon key pública de Supabase |
+| `E2E_BASE_URL` | Default `http://localhost:3001` |
+| `TEST_ADMIN_EMAIL` | Email de un usuario admin (default `admin@test.com`) |
+| `TEST_ADMIN_PASSWORD` | Password del admin (default `test123456`) |
 
 ## Atajos de teclado
 
@@ -103,3 +119,17 @@ Los tests viven en `apps/dispatcher/e2e/`.
 | `/` | Enfocar búsqueda (en páginas con FilterBar) |
 | `N` | Nuevo registro (en páginas de lista) |
 | `Esc` | Cerrar modal/drawer |
+
+## Arquitectura
+
+- **Auth & rol**: `requireRole()` de `@/lib/auth/require-role` corre en server components.
+- **Segmentos**:
+  - `(auth)` para login,
+  - `(dashboard)` para dispatch live,
+  - `(admin)` para panel administrativo.
+- **Confirms destructivos**: `useConfirm()` de `@/components/admin/confirm-dialog`.
+- **Datos**: `useSupabaseQuery` (lectura paginada + refetch) y `useExportCsv` (CSV en chunks).
+- **Realtime**: `useRealtimeTable` para refrescar listas ante cambios en DB.
+- **Observabilidad**: Sentry replay con masking total + PostHog con session recording deshabilitado en admin.
+
+Tipos Supabase: `import type { Database } from '@remis/shared-types/database'`.

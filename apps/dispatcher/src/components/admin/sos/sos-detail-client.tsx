@@ -1173,7 +1173,7 @@ export function SosDetailClient({ sosId }: SosDetailClientProps) {
               <select
                 value={resolveOutcome}
                 onChange={(e) => setResolveOutcome(e.target.value as ResolutionOutcome)}
-                className="w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--neutral-300)] bg-white text-[var(--text-sm)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]"
+                className="w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--neutral-300)] bg-white text-[var(--text-sm)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
               >
                 {RESOLUTION_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>

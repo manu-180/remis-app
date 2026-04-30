@@ -246,7 +246,7 @@ export function FareMatrix({ zones, fares, filter, onUpsert, isLoading }: FareMa
                           ref={inputRef}
                           type="number"
                           autoFocus
-                          className="w-24 rounded border border-[var(--primary-400)] px-2 py-1 text-center text-sm outline-none focus:ring-2 focus:ring-[var(--primary-400)] bg-[var(--neutral-0)] text-[var(--neutral-900)]"
+                          className="w-24 rounded border border-[var(--primary-400)] px-2 py-1 text-center text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-400)] bg-[var(--neutral-0)] text-[var(--neutral-900)]"
                           value={editingCell.value}
                           onChange={(e) =>
                             setEditingCell((prev) =>
