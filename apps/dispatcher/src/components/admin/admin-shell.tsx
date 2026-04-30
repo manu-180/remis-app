@@ -7,7 +7,7 @@ import { PageTransition } from './page-transition';
 import { CommandPalette } from './command-palette';
 import { ShortcutHelpModal } from './shortcut-help-modal';
 import { ConfirmDialogProvider } from './confirm-dialog';
-import { Drawer } from '@/components/ui/drawer';
+import { MobileDrawer } from './mobile-drawer';
 import { cn } from '@/lib/utils';
 import { useSosWatcher } from '@/hooks/use-sos-watcher';
 import type { Database } from '@remis/shared-types/database';
@@ -64,13 +64,8 @@ export function AdminShell({ profile, children }: AdminShellProps) {
         <Sidebar collapsed={collapsed} onToggle={handleToggle} role={profile.role} />
       </aside>
 
-      {/* Sidebar mobile — Drawer desde la izquierda */}
-      <Drawer
-        open={mobileOpen}
-        onOpenChange={setMobileOpen}
-        width="sm"
-        side="left"
-      >
+      {/* Sidebar mobile — drawer premium desde la izquierda */}
+      <MobileDrawer open={mobileOpen} onClose={() => setMobileOpen(false)}>
         <MobileSidebar
           collapsed={false}
           onToggle={() => setMobileOpen(false)}
@@ -78,7 +73,7 @@ export function AdminShell({ profile, children }: AdminShellProps) {
           role={profile.role}
           onClose={() => setMobileOpen(false)}
         />
-      </Drawer>
+      </MobileDrawer>
 
       {/* Main content */}
       <div
