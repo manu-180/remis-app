@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,24 @@ import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 type Stage = 'verifying' | 'set-password' | 'error';
 
 export default function AcceptInvitePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="w-full max-w-sm">
+          <div className="bg-[var(--neutral-100)] border border-[var(--neutral-200)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-8">
+            <p className="text-center text-[var(--text-sm)] text-[var(--neutral-500)]">
+              Validando invitación…
+            </p>
+          </div>
+        </div>
+      }
+    >
+      <AcceptInviteInner />
+    </Suspense>
+  );
+}
+
+function AcceptInviteInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 

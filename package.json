@@ -11,6 +11,7 @@
     "env:sync": "node scripts/sync-env.mjs",
     "env:check": "node scripts/sync-env.mjs --check",
     "predev": "node scripts/sync-env.mjs --env dev",
+    "supabase:types": "supabase gen types typescript --project-id kmdnsxbpzidpkinlablf > packages/shared-types/database.ts && echo Types regenerated.",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",

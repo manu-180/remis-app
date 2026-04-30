@@ -16,13 +16,17 @@ import {
   Activity,
   Calendar,
   Layers,
+  RefreshCw,
 } from 'lucide-react';
 import { useSupabaseQuery } from '@/hooks/use-supabase-query';
 import { DataTable, FilterBar, createActionsColumn } from '@/components/admin/data-table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Stat } from '@/components/ui/stat';
 import { Drawer } from '@/components/ui/drawer';
+import { toast } from '@/components/ui/use-toast';
+import { escapeOrFilter } from '@/lib/postgrest-safe';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,6 +43,13 @@ type AuditLog = {
   created_at: string;
 };
 
+type AuditStatsRow = {
+  entity: string;
+  action: string;
+  actor_role: string | null;
+  created_at: string;
+};
+
 const chainEntrySchema = z
   .object({
     mismatch: z.boolean().optional(),
@@ -47,8 +58,13 @@ const chainEntrySchema = z
 const chainDataSchema = z.array(chainEntrySchema);
 type ChainEntry = z.infer<typeof chainEntrySchema>;
 
-type AuditData = {
+type AuditPageData = {
   logs: AuditLog[];
+  totalCount: number;
+};
+
+type AuditMetaData = {
+  stats: AuditStatsRow[];
   chainData: ChainEntry[] | null;
   chainError: boolean;
 };
@@ -99,6 +115,7 @@ function actionBadge(action: string) {
 }
 
 const PAGE_SIZE = 100;
+const STATS_LIMIT = 2000;
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -115,20 +132,22 @@ export function AuditClient() {
   });
 
   // ---------------------------------------------------------------------------
-  // Data fetch
+  // Stats + chain (lightweight, fetched once)
   // ---------------------------------------------------------------------------
-  const { data, isLoading, error } = useSupabaseQuery<AuditData>(
-    ['audit-log'],
+  const [verifying, setVerifying] = useState(false);
+  const { data: meta, isLoading: metaLoading, refetch: refetchMeta } = useSupabaseQuery<AuditMetaData>(
+    ['audit-meta'],
     async (sb) => {
-      const [logsResult, chainResult] = await Promise.all([
+      const [statsResult, chainResult] = await Promise.all([
         sb
           .from('audit_log')
-          .select('*')
+          .select('entity, action, actor_role, created_at')
           .order('created_at', { ascending: false })
-          .limit(500),
-        (sb as any).rpc('audit_log_hash_chain').then(
-          (r: { data: unknown; error: unknown }) => r,
-        ).catch(() => ({ data: null, error: new Error('rpc error') })),
+          .limit(STATS_LIMIT),
+        (sb as any)
+          .rpc('audit_log_hash_chain')
+          .then((r: { data: unknown; error: unknown }) => r)
+          .catch(() => ({ data: null, error: new Error('rpc error') })),
       ]);
 
       let chainData: ChainEntry[] | null = null;
@@ -145,24 +164,110 @@ export function AuditClient() {
 
       return {
         data: {
-          logs: (logsResult.data ?? []) as AuditLog[],
+          stats: (statsResult.data ?? []) as AuditStatsRow[],
           chainData,
           chainError: !!chainResult.error || chainShapeError,
         },
-        error: logsResult.error,
+        error: statsResult.error,
       };
     },
   );
 
-  const logs = data?.logs ?? [];
-  const chainData = data?.chainData ?? null;
-  const chainError = data?.chainError ?? false;
+  const stats = useMemo(() => meta?.stats ?? [], [meta]);
+  const chainData = meta?.chainData ?? null;
+  const chainError = meta?.chainError ?? false;
 
   // ---------------------------------------------------------------------------
-  // Hash chain banner
+  // Server-side paginated logs
   // ---------------------------------------------------------------------------
+  const q = typeof filters.q === 'string' ? filters.q : '';
+  const entityFilter = Array.isArray(filters.entity) ? (filters.entity as string[]) : [];
+  const actionFilter = Array.isArray(filters.action) ? (filters.action as string[]) : [];
+  const roleFilter = Array.isArray(filters.actor_role) ? (filters.actor_role as string[]) : [];
+  const dateFilter =
+    typeof filters.fecha === 'object' && filters.fecha !== null
+      ? (filters.fecha as { from?: string; to?: string })
+      : {};
+
+  const {
+    data: pageData,
+    isLoading: pageLoading,
+    error,
+  } = useSupabaseQuery<AuditPageData>(
+    ['audit-log-page', filters, page],
+    async (sb) => {
+      let query = (sb as any)
+        .from('audit_log')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+
+      if (entityFilter.length > 0) {
+        query = query.in('entity', entityFilter);
+      }
+      if (actionFilter.length > 0) {
+        query = query.in('action', actionFilter);
+      }
+      if (roleFilter.length > 0) {
+        query = query.in('actor_role', roleFilter);
+      }
+      if (q) {
+        const safe = escapeOrFilter(q);
+        query = query.ilike('entity_id', `%${safe}%`);
+      }
+      if (dateFilter.from) {
+        query = query.gte('created_at', dateFilter.from + 'T00:00:00');
+      }
+      if (dateFilter.to) {
+        query = query.lte('created_at', dateFilter.to + 'T23:59:59');
+      }
+
+      const result = await query;
+      return {
+        data: {
+          logs: (result.data ?? []) as AuditLog[],
+          totalCount: result.count ?? 0,
+        },
+        error: result.error,
+      };
+    },
+  );
+
+  const pagedLogs = pageData?.logs ?? [];
+  const totalCount = pageData?.totalCount ?? 0;
+  const isLoading = pageLoading || metaLoading;
+
+  // ---------------------------------------------------------------------------
+  // Hash chain banner — re-verifies via the same RPC the page loads with
+  // ---------------------------------------------------------------------------
+  async function handleVerifyChain() {
+    setVerifying(true);
+    try {
+      await refetchMeta();
+      toast.success('Cadena de auditoría re-verificada.');
+    } catch {
+      toast.error('No pudimos verificar la cadena. Reintentá en unos segundos.');
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  const verifyButton = (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleVerifyChain}
+      disabled={verifying || metaLoading}
+      className="ml-auto shrink-0"
+      aria-label="Verificar cadena ahora"
+    >
+      <RefreshCw size={13} className={verifying ? 'animate-spin' : ''} />
+      <span className="ml-1.5">Verificar ahora</span>
+    </Button>
+  );
+
   const chainBanner = useMemo(() => {
-    if (isLoading) return null;
+    if (metaLoading) return null;
     if (chainError || chainData === null) {
       return (
         <div className="flex items-center gap-3 p-4 rounded-[var(--radius-md)] bg-[var(--warning)]/10 border border-[var(--warning)]/30 text-[var(--warning)]">
@@ -170,6 +275,7 @@ export function AuditClient() {
           <span className="font-medium">
             No se pudo verificar la cadena de auditoría.
           </span>
+          {verifyButton}
         </div>
       );
     }
@@ -185,6 +291,7 @@ export function AuditClient() {
           <span className="font-medium">
             No se pudo verificar la cadena de auditoría.
           </span>
+          {verifyButton}
         </div>
       );
     }
@@ -196,6 +303,7 @@ export function AuditClient() {
           <span className="font-medium">
             Cadena de auditoría comprometida ({mismatches} inconsistencias) — contactar al desarrollador.
           </span>
+          {verifyButton}
         </div>
       );
     }
@@ -205,22 +313,24 @@ export function AuditClient() {
       <div className="flex items-center gap-2 p-3 rounded-[var(--radius-md)] bg-[var(--success)]/10 border border-[var(--success)]/20 text-[var(--success)] text-sm">
         <ShieldCheck size={16} />
         <span>Cadena de auditoría íntegra ({total} eventos verificados)</span>
+        {verifyButton}
       </div>
     );
-  }, [isLoading, chainError, chainData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metaLoading, chainError, chainData, verifying]);
 
   // ---------------------------------------------------------------------------
-  // KPI strip
+  // KPI strip — computed from lightweight stats query
   // ---------------------------------------------------------------------------
   const today = todayIso();
   const eventsToday = useMemo(
-    () => logs.filter((l) => l.created_at.startsWith(today)).length,
-    [logs, today],
+    () => stats.filter((l) => l.created_at.startsWith(today)).length,
+    [stats, today],
   );
 
   const topAction = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const l of logs) {
+    for (const l of stats) {
       counts[l.action] = (counts[l.action] ?? 0) + 1;
     }
     let best = '—';
@@ -232,32 +342,30 @@ export function AuditClient() {
       }
     }
     return best;
-  }, [logs]);
+  }, [stats]);
 
   const distinctEntities = useMemo(
-    () => new Set(logs.map((l) => l.entity)).size,
-    [logs],
+    () => new Set(stats.map((l) => l.entity)).size,
+    [stats],
   );
 
   // ---------------------------------------------------------------------------
-  // Filter options (dynamic from data)
+  // Filter options (dynamic from stats sample)
   // ---------------------------------------------------------------------------
   const entityOptions = useMemo(
     () =>
-      Array.from(new Set(logs.map((l) => l.entity))).map((e) => ({
-        value: e,
-        label: e,
-      })),
-    [logs],
+      Array.from(new Set(stats.map((l) => l.entity)))
+        .sort()
+        .map((e) => ({ value: e, label: e })),
+    [stats],
   );
 
   const actionOptions = useMemo(
     () =>
-      Array.from(new Set(logs.map((l) => l.action))).map((a) => ({
-        value: a,
-        label: a,
-      })),
-    [logs],
+      Array.from(new Set(stats.map((l) => l.action)))
+        .sort()
+        .map((a) => ({ value: a, label: a })),
+    [stats],
   );
 
   const actorRoleOptions = [
@@ -265,39 +373,6 @@ export function AuditClient() {
     { value: 'dispatcher', label: 'Dispatcher' },
     { value: 'system', label: 'System' },
   ];
-
-  // ---------------------------------------------------------------------------
-  // Client-side filtering
-  // ---------------------------------------------------------------------------
-  const filteredLogs = useMemo(() => {
-    const q = typeof filters.q === 'string' ? filters.q.toLowerCase() : '';
-    const entityFilter = Array.isArray(filters.entity) ? (filters.entity as string[]) : [];
-    const actionFilter = Array.isArray(filters.action) ? (filters.action as string[]) : [];
-    const roleFilter = Array.isArray(filters.actor_role) ? (filters.actor_role as string[]) : [];
-    const dateFilter =
-      typeof filters.fecha === 'object' && filters.fecha !== null
-        ? (filters.fecha as { from?: string; to?: string })
-        : {};
-
-    return logs.filter((l) => {
-      if (q && !l.entity_id.toLowerCase().includes(q)) return false;
-      if (entityFilter.length > 0 && !entityFilter.includes(l.entity)) return false;
-      if (actionFilter.length > 0 && !actionFilter.includes(l.action)) return false;
-      if (roleFilter.length > 0 && !roleFilter.includes(l.actor_role ?? '')) return false;
-      if (dateFilter.from && l.created_at < dateFilter.from) return false;
-      if (dateFilter.to && l.created_at > dateFilter.to + 'T23:59:59') return false;
-      return true;
-    });
-  }, [logs, filters]);
-
-  // ---------------------------------------------------------------------------
-  // Pagination (client-side)
-  // ---------------------------------------------------------------------------
-  const totalFiltered = filteredLogs.length;
-  const pagedLogs = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return filteredLogs.slice(start, start + PAGE_SIZE);
-  }, [filteredLogs, page]);
 
   // ---------------------------------------------------------------------------
   // Columns
@@ -411,7 +486,7 @@ export function AuditClient() {
             label="Eventos hoy"
             value={eventsToday}
             icon={<Calendar size={16} />}
-            loading={isLoading}
+            loading={metaLoading}
           />
         </Card>
         <Card>
@@ -419,7 +494,7 @@ export function AuditClient() {
             label="Acción más frecuente"
             value={topAction}
             icon={<Activity size={16} />}
-            loading={isLoading}
+            loading={metaLoading}
           />
         </Card>
         <Card>
@@ -427,7 +502,7 @@ export function AuditClient() {
             label="Entidades"
             value={distinctEntities}
             icon={<Layers size={16} />}
-            loading={isLoading}
+            loading={metaLoading}
           />
         </Card>
       </div>
@@ -474,12 +549,12 @@ export function AuditClient() {
         loading={isLoading}
         error={error}
         onRowClick={(row) => setSelectedLog(row)}
-        {...(totalFiltered > PAGE_SIZE
+        {...(totalCount > PAGE_SIZE
           ? {
               pagination: {
                 pageIndex: page - 1,
                 pageSize: PAGE_SIZE,
-                total: totalFiltered,
+                total: totalCount,
                 onChange: ({ pageIndex }: { pageIndex: number; pageSize: number }) =>
                   setPage(pageIndex + 1),
               },

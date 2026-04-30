@@ -1,19 +1,23 @@
 'use client';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-import { useState, useEffect, useMemo } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+import { useState, useMemo } from 'react';
 import { Copy, Eye, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { ColumnDef } from '@tanstack/react-table';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import { useSupabaseQuery } from '@/hooks/use-supabase-query';
 import { useExportCsv } from '@/hooks/use-export-csv';
 import type { CsvColumn } from '@/lib/export-csv';
+import { escapeOrFilter } from '@/lib/postgrest-safe';
+import { useConfirm } from '@/components/admin/confirm-dialog';
+import { toast } from '@/components/ui/use-toast';
 import {
   DataTable,
   FilterBar,
   ExportCsvButton,
-  createActionsColumn,
   createDateColumn,
 } from '@/components/admin/data-table';
 import { Card, CardContent } from '@/components/ui/card';
@@ -29,7 +33,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { formatARS } from '@/lib/format';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -45,18 +48,27 @@ type PaymentRow = {
   paid_at: string | null;
 };
 
+type PaymentStatsRow = {
+  amount_ars: number;
+  status: PaymentRow['status'];
+  method: PaymentRow['method'];
+  paid_at: string | null;
+};
+
 type WebhookRow = {
   id: string;
   x_request_id: string | null;
   data_id: string;
   action: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   raw_body: any;
   signature_valid: boolean;
   processed_status: string;
   error_message: string | null;
   received_at: string;
 };
+
+const PAGE_SIZE = 50;
+const STATS_LIMIT = 1000;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -111,10 +123,7 @@ function mapWebhookStatus(status: string): { variant: PillVariant; label: string
   return map[status] ?? { variant: 'offline' as PillVariant, label: status };
 }
 
-// ---------------------------------------------------------------------------
-// KPI computations
-// ---------------------------------------------------------------------------
-function computeKpis(payments: PaymentRow[]) {
+function computeKpis(rows: PaymentStatsRow[]) {
   const today = todayIso();
   const { from: monthFrom, to: monthTo } = currentMonthRange();
 
@@ -124,7 +133,7 @@ function computeKpis(payments: PaymentRow[]) {
   let approvedTotal = 0;
   let approvedMP = 0;
 
-  for (const p of payments) {
+  for (const p of rows) {
     if (p.status === 'approved') {
       approvedTotal++;
       if (p.method === 'mercadopago') approvedMP++;
@@ -281,14 +290,34 @@ function PaymentDetailDrawer({
 }
 
 // ---------------------------------------------------------------------------
+// Helper to apply payments filters to a Supabase query
+// ---------------------------------------------------------------------------
+function applyPaymentsFilters(
+  query: any,
+  filters: {
+    q: string;
+    statusFilter: string[];
+    methodFilter: string[];
+    dateFilter: { from?: string; to?: string };
+  },
+) {
+  const { q, statusFilter, methodFilter, dateFilter } = filters;
+  if (statusFilter.length > 0) query = query.in('status', statusFilter);
+  if (methodFilter.length > 0) query = query.in('method', methodFilter);
+  if (q) {
+    const safe = escapeOrFilter(q);
+    query = query.or(`mp_payment_id.ilike.%${safe}%,ride_id.ilike.%${safe}%`);
+  }
+  if (dateFilter.from) query = query.gte('paid_at', dateFilter.from + 'T00:00:00');
+  if (dateFilter.to) query = query.lte('paid_at', dateFilter.to + 'T23:59:59');
+  return query;
+}
+
+// ---------------------------------------------------------------------------
 // Main client
 // ---------------------------------------------------------------------------
 export function PaymentsClient() {
-  const [payments, setPayments] = useState<PaymentRow[]>([]);
-  const [webhooks, setWebhooks] = useState<WebhookRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [webhooksLoading, setWebhooksLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const confirm = useConfirm();
 
   // Detail drawer
   const [selectedPayment, setSelectedPayment] = useState<PaymentRow | null>(null);
@@ -299,108 +328,162 @@ export function PaymentsClient() {
   const [selectedWebhook, setSelectedWebhook] = useState<WebhookRow | null>(null);
   const [webhookDialogOpen, setWebhookDialogOpen] = useState(false);
 
-  // Payments filters
+  // Payments filters + page
   const [filters, setFilters] = useState<Record<string, unknown>>({
     q: '',
     status: [] as string[],
     method: [] as string[],
     fecha: {} as { from?: string; to?: string },
   });
+  const [page, setPage] = useState(1);
+
+  // Webhooks page
+  const [webhooksPage, setWebhooksPage] = useState(1);
+
+  // Normalized filter values, derived from `filters` (stable references for hook deps)
+  const filterArgs = useMemo(
+    () => ({
+      q: typeof filters.q === 'string' ? filters.q : '',
+      statusFilter: Array.isArray(filters.status) ? (filters.status as string[]) : [],
+      methodFilter: Array.isArray(filters.method) ? (filters.method as string[]) : [],
+      dateFilter:
+        typeof filters.fecha === 'object' && filters.fecha !== null
+          ? (filters.fecha as { from?: string; to?: string })
+          : {},
+    }),
+    [filters],
+  );
 
   // ---------------------------------------------------------------------------
-  // Fetch
+  // KPI stats (lightweight — last 1000 rows globally)
   // ---------------------------------------------------------------------------
-  useEffect(() => {
-    const sb = getSupabaseBrowserClient();
-
-    (async () => {
-      setLoading(true);
-      const { data, error: err } = await sb
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    refetch: refetchStats,
+  } = useSupabaseQuery<PaymentStatsRow[]>(
+    ['payments-stats'],
+    async (sb) => {
+      const { data, error } = await sb
         .from('payments')
-        .select('*')
-        .order('paid_at', { ascending: false, nullsFirst: false });
+        .select('amount_ars, status, method, paid_at')
+        .order('paid_at', { ascending: false, nullsFirst: false })
+        .limit(STATS_LIMIT);
+      return {
+        data: (data ?? []) as PaymentStatsRow[],
+        error,
+      };
+    },
+  );
 
-      if (err) {
-        setError(new Error(err.message));
-      } else {
-        setPayments((data ?? []) as PaymentRow[]);
-      }
-      setLoading(false);
-    })();
-
-    (async () => {
-      setWebhooksLoading(true);
-      try {
-        const { data } = await sb
-          .from('mp_webhook_events')
-          .select('*')
-          .order('received_at', { ascending: false });
-        setWebhooks((data ?? []) as WebhookRow[]);
-      } catch {
-        // Table may not exist — show empty state
-        setWebhooks([]);
-      }
-      setWebhooksLoading(false);
-    })();
-  }, []);
+  const kpis = useMemo(() => computeKpis(stats ?? []), [stats]);
 
   // ---------------------------------------------------------------------------
-  // Refund
+  // Paginated payments
+  // ---------------------------------------------------------------------------
+  const {
+    data: pageData,
+    isLoading: pageLoading,
+    error,
+    refetch: refetchPage,
+  } = useSupabaseQuery<{ rows: PaymentRow[]; total: number }>(
+    ['payments-page', filters, page],
+    async (sb) => {
+      let query: any = (sb as any)
+        .from('payments')
+        .select('*', { count: 'exact' })
+        .order('paid_at', { ascending: false, nullsFirst: false })
+        .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+
+      query = applyPaymentsFilters(query, filterArgs);
+
+      const result = await query;
+      return {
+        data: {
+          rows: (result.data ?? []) as PaymentRow[],
+          total: result.count ?? 0,
+        },
+        error: result.error,
+      };
+    },
+  );
+
+  const payments = pageData?.rows ?? [];
+  const totalPayments = pageData?.total ?? 0;
+  const loading = pageLoading || statsLoading;
+
+  // ---------------------------------------------------------------------------
+  // Paginated webhooks
+  // ---------------------------------------------------------------------------
+  const { data: webhooksData, isLoading: webhooksLoading } =
+    useSupabaseQuery<{ rows: WebhookRow[]; total: number }>(
+      ['mp-webhooks-page', webhooksPage],
+      async (sb) => {
+        try {
+          const result = await (sb as any)
+            .from('mp_webhook_events')
+            .select('*', { count: 'exact' })
+            .order('received_at', { ascending: false })
+            .range(
+              (webhooksPage - 1) * PAGE_SIZE,
+              webhooksPage * PAGE_SIZE - 1,
+            );
+          return {
+            data: {
+              rows: (result.data ?? []) as WebhookRow[],
+              total: result.count ?? 0,
+            },
+            error: result.error,
+          };
+        } catch {
+          // Table may not exist
+          return { data: { rows: [], total: 0 }, error: null };
+        }
+      },
+    );
+
+  const webhooks = webhooksData?.rows ?? [];
+  const totalWebhooks = webhooksData?.total ?? 0;
+
+  // ---------------------------------------------------------------------------
+  // Refund (simulated — only flips status, does NOT call MercadoPago)
   // ---------------------------------------------------------------------------
   async function handleRefund(paymentId: string) {
+    const ok = await confirm({
+      title: '¿Marcar este pago como reembolsado?',
+      description:
+        'Solo cambia el estado del pago en la base de datos. NO ejecuta una devolución real en MercadoPago. Para reembolsar de verdad, hacelo manualmente desde tu panel de MP.',
+      confirmLabel: 'Sí, marcar como reembolsado',
+      cancelLabel: 'Cancelar',
+      danger: true,
+    });
+    if (!ok) return;
+
     setRefunding(true);
-    // NOTE: This is a simulated refund - does NOT call MP API
-    // TODO: Implement real MP refund via API
     const sb = getSupabaseBrowserClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (sb as any).from('payments').update({ status: 'refunded' }).eq('id', paymentId);
-    setPayments((prev) =>
-      prev.map((p) => (p.id === paymentId ? { ...p, status: 'refunded' as const } : p)),
-    );
+    const { error } = await (sb as any)
+      .from('payments')
+      .update({ status: 'refunded' })
+      .eq('id', paymentId);
+
+    setRefunding(false);
+
+    if (error) {
+      toast.error('No pudimos marcar el pago como reembolsado. Reintentá en unos segundos.');
+      return;
+    }
+
     if (selectedPayment?.id === paymentId) {
       setSelectedPayment((p) => (p ? { ...p, status: 'refunded' as const } : p));
     }
-    setRefunding(false);
     setDrawerOpen(false);
+    toast.success('Pago marcado como reembolsado en el sistema.');
+    refetchPage();
+    refetchStats();
   }
 
   // ---------------------------------------------------------------------------
-  // Client-side filtering
-  // ---------------------------------------------------------------------------
-  const filteredPayments = useMemo(() => {
-    const q = typeof filters.q === 'string' ? filters.q.toLowerCase() : '';
-    const statusFilter = Array.isArray(filters.status) ? (filters.status as string[]) : [];
-    const methodFilter = Array.isArray(filters.method) ? (filters.method as string[]) : [];
-    const dateFilter =
-      typeof filters.fecha === 'object' && filters.fecha !== null
-        ? (filters.fecha as { from?: string; to?: string })
-        : {};
-
-    return payments.filter((p) => {
-      if (q) {
-        const mpId = (p.mp_payment_id ?? '').toLowerCase();
-        const rideId = p.ride_id.toLowerCase();
-        if (!mpId.includes(q) && !rideId.includes(q)) return false;
-      }
-      if (statusFilter.length > 0 && !statusFilter.includes(p.status)) return false;
-      if (methodFilter.length > 0 && !methodFilter.includes(p.method)) return false;
-      if (dateFilter.from && p.paid_at) {
-        if (p.paid_at < dateFilter.from + 'T00:00:00') return false;
-      }
-      if (dateFilter.to && p.paid_at) {
-        if (p.paid_at > dateFilter.to + 'T23:59:59') return false;
-      }
-      return true;
-    });
-  }, [payments, filters]);
-
-  // ---------------------------------------------------------------------------
-  // KPIs
-  // ---------------------------------------------------------------------------
-  const kpis = useMemo(() => computeKpis(payments), [payments]);
-
-  // ---------------------------------------------------------------------------
-  // CSV exports — payments respect filters; webhooks export all rows in tab
+  // CSV exports — pull all filtered rows from server in chunks
   // ---------------------------------------------------------------------------
   const paymentCsvColumns: CsvColumn<PaymentRow>[] = [
     { header: 'ID', accessor: (p) => p.id },
@@ -420,10 +503,16 @@ export function PaymentsClient() {
     useExportCsv<PaymentRow>({
       filename: 'payments',
       columns: paymentCsvColumns,
-      // Data is loaded entirely in memory; honor current filters by paginating
-      // over filteredPayments rather than re-querying.
       fetchPage: async (offset, limit) => {
-        return filteredPayments.slice(offset, offset + limit);
+        const sb = getSupabaseBrowserClient();
+        let query: any = (sb as any)
+          .from('payments')
+          .select('*')
+          .order('paid_at', { ascending: false, nullsFirst: false })
+          .range(offset, offset + limit - 1);
+        query = applyPaymentsFilters(query, filterArgs);
+        const { data } = await query;
+        return (data ?? []) as PaymentRow[];
       },
     });
 
@@ -446,7 +535,17 @@ export function PaymentsClient() {
       filename: 'mp-webhooks',
       columns: webhookCsvColumns,
       fetchPage: async (offset, limit) => {
-        return webhooks.slice(offset, offset + limit);
+        const sb = getSupabaseBrowserClient();
+        try {
+          const { data } = await (sb as any)
+            .from('mp_webhook_events')
+            .select('*')
+            .order('received_at', { ascending: false })
+            .range(offset, offset + limit - 1);
+          return (data ?? []) as WebhookRow[];
+        } catch {
+          return [];
+        }
       },
     });
 
@@ -531,8 +630,26 @@ export function PaymentsClient() {
         );
       },
     },
-    // Actions column intentionally empty — view and refund are inline columns below
-    // We add refund separately via dynamic column
+    {
+      id: '__view__',
+      header: '',
+      size: 52,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <button
+          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--neutral-600)] hover:bg-[var(--neutral-100)] transition-colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedPayment(row.original);
+            setDrawerOpen(true);
+          }}
+          title="Ver detalle"
+        >
+          <Eye size={11} />
+          Ver
+        </button>
+      ),
+    },
     {
       id: '__refund__',
       header: '',
@@ -557,32 +674,6 @@ export function PaymentsClient() {
     },
   ];
 
-  // "Ver" action injected directly so we avoid stale closure issues
-  const paymentColumnsWithView: ColumnDef<PaymentRow, unknown>[] = [
-    ...paymentColumns.slice(0, -1), // everything except __refund__
-    {
-      id: '__view__',
-      header: '',
-      size: 52,
-      enableSorting: false,
-      cell: ({ row }) => (
-        <button
-          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--neutral-600)] hover:bg-[var(--neutral-100)] transition-colors"
-          onClick={(e) => {
-            e.stopPropagation();
-            setSelectedPayment(row.original);
-            setDrawerOpen(true);
-          }}
-          title="Ver detalle"
-        >
-          <Eye size={11} />
-          Ver
-        </button>
-      ),
-    },
-    paymentColumns[paymentColumns.length - 1]!, // __refund__
-  ];
-
   // ---------------------------------------------------------------------------
   // Webhooks columns
   // ---------------------------------------------------------------------------
@@ -604,9 +695,7 @@ export function PaymentsClient() {
       id: 'action',
       header: 'Acción',
       enableSorting: false,
-      cell: ({ row }) => (
-        <span className="text-sm">{row.original.action}</span>
-      ),
+      cell: ({ row }) => <span className="text-sm">{row.original.action}</span>,
     },
     {
       id: 'signature_valid',
@@ -651,6 +740,23 @@ export function PaymentsClient() {
   ];
 
   // ---------------------------------------------------------------------------
+  // Range label helpers
+  // ---------------------------------------------------------------------------
+  const paymentsRangeLabel = useMemo(() => {
+    if (totalPayments === 0) return null;
+    const start = (page - 1) * PAGE_SIZE + 1;
+    const end = Math.min(page * PAGE_SIZE, totalPayments);
+    return `Mostrando ${start.toLocaleString('es-AR')}–${end.toLocaleString('es-AR')} de ${totalPayments.toLocaleString('es-AR')}`;
+  }, [page, totalPayments]);
+
+  const webhooksRangeLabel = useMemo(() => {
+    if (totalWebhooks === 0) return null;
+    const start = (webhooksPage - 1) * PAGE_SIZE + 1;
+    const end = Math.min(webhooksPage * PAGE_SIZE, totalWebhooks);
+    return `Mostrando ${start.toLocaleString('es-AR')}–${end.toLocaleString('es-AR')} de ${totalWebhooks.toLocaleString('es-AR')}`;
+  }, [webhooksPage, totalWebhooks]);
+
+  // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
   return (
@@ -661,28 +767,28 @@ export function PaymentsClient() {
           <Stat
             label="Cobrado hoy"
             value={fmtCurrency(kpis.cobradoHoy)}
-            loading={loading}
+            loading={statsLoading}
           />
         </Card>
         <Card>
           <Stat
             label="Pendiente"
             value={fmtCurrency(kpis.pendiente)}
-            loading={loading}
+            loading={statsLoading}
           />
         </Card>
         <Card>
           <Stat
             label="Reembolsado (mes)"
             value={fmtCurrency(kpis.reembolsadoMes)}
-            loading={loading}
+            loading={statsLoading}
           />
         </Card>
         <Card>
           <Stat
             label="% MercadoPago"
             value={`${kpis.pctMP}%`}
-            loading={loading}
+            loading={statsLoading}
           />
         </Card>
       </div>
@@ -728,22 +834,42 @@ export function PaymentsClient() {
                   { id: 'fecha', type: 'daterange', label: 'Fecha' },
                 ]}
                 value={filters}
-                onChange={setFilters}
+                onChange={(v) => {
+                  setFilters(v);
+                  setPage(1);
+                }}
               />
             </div>
             <ExportCsvButton
               size="sm"
               onClick={exportPayments}
               exporting={exportingPayments}
-              emptyHint={filteredPayments.length === 0 && !loading}
+              emptyHint={totalPayments === 0 && !loading}
             />
           </div>
 
+          {paymentsRangeLabel && (
+            <p className="text-xs text-[var(--neutral-500)] tabular-nums">
+              {paymentsRangeLabel}
+            </p>
+          )}
+
           <DataTable
-            columns={paymentColumnsWithView}
-            data={filteredPayments}
+            columns={paymentColumns}
+            data={payments}
             loading={loading}
             error={error}
+            {...(totalPayments > PAGE_SIZE
+              ? {
+                  pagination: {
+                    pageIndex: page - 1,
+                    pageSize: PAGE_SIZE,
+                    total: totalPayments,
+                    onChange: ({ pageIndex }: { pageIndex: number; pageSize: number }) =>
+                      setPage(pageIndex + 1),
+                  },
+                }
+              : {})}
             emptyState={
               <div className="py-16 text-center text-[var(--neutral-500)] text-sm">
                 No hay pagos que coincidan con los filtros.
@@ -754,7 +880,7 @@ export function PaymentsClient() {
 
         {/* ---- Tab Webhooks ---- */}
         <TabsContent value="webhooks" className="space-y-4 mt-4">
-          {webhooks.length === 0 && !webhooksLoading ? (
+          {totalWebhooks === 0 && !webhooksLoading ? (
             <Card>
               <CardContent className="py-16 text-center text-sm text-[var(--neutral-500)]">
                 No hay eventos de webhook registrados.
@@ -767,13 +893,29 @@ export function PaymentsClient() {
                   size="sm"
                   onClick={exportWebhooks}
                   exporting={exportingWebhooks}
-                  emptyHint={webhooks.length === 0 && !webhooksLoading}
+                  emptyHint={totalWebhooks === 0 && !webhooksLoading}
                 />
               </div>
+              {webhooksRangeLabel && (
+                <p className="text-xs text-[var(--neutral-500)] tabular-nums">
+                  {webhooksRangeLabel}
+                </p>
+              )}
               <DataTable
                 columns={webhookColumns}
                 data={webhooks}
                 loading={webhooksLoading}
+                {...(totalWebhooks > PAGE_SIZE
+                  ? {
+                      pagination: {
+                        pageIndex: webhooksPage - 1,
+                        pageSize: PAGE_SIZE,
+                        total: totalWebhooks,
+                        onChange: ({ pageIndex }: { pageIndex: number; pageSize: number }) =>
+                          setWebhooksPage(pageIndex + 1),
+                      },
+                    }
+                  : {})}
                 emptyState={
                   <div className="py-16 text-center text-[var(--neutral-500)] text-sm">
                     No hay webhooks registrados.
@@ -807,6 +949,7 @@ export function PaymentsClient() {
           </pre>
         </DialogContent>
       </Dialog>
+
     </>
   );
 }
