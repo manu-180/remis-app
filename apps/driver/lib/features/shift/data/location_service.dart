@@ -1,93 +1,123 @@
+import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
-import 'package:flutter_background_geolocation/flutter_background_geolocation.dart' as bg;
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:remis_flutter_core/remis_flutter_core.dart';
 
 class LocationService {
+  static StreamSubscription<Position>? _positionSub;
+  static StreamSubscription<Position>? _realtimeSub;
+  static Timer? _heartbeatTimer;
+
+  // Broadcast stream que recibe todas las posiciones GPS.
+  // Vive durante toda la vida de la app; no se cierra al hacer stop().
+  static final _positionController = StreamController<Position>.broadcast();
+
   static bool _ready = false;
 
+  // Credenciales para el sync a Supabase (se llenan en init)
+  static String? _driverId;
+  static String? _supabaseUrl;
+  static String? _supabaseAnonKey;
+  static String? _accessToken;
+
+  /// Stream público de posiciones GPS. Usarlo para escuchar ubicaciones
+  /// (reemplaza BackgroundGeolocation.onLocation).
+  static Stream<Position> get positionStream => _positionController.stream;
+
   static Future<void> init({required Session session}) async {
-    await bg.BackgroundGeolocation.ready(bg.Config(
-      desiredAccuracy: bg.Config.DESIRED_ACCURACY_HIGH,
-      distanceFilter: 20.0,
-      stopTimeout: 5,
-      heartbeatInterval: 30,
-      locationAuthorizationRequest: 'Always',
-      backgroundPermissionRationale: bg.PermissionRationale(
-        title: 'Remís necesita tu ubicación todo el tiempo',
-        message: 'Para enviarte pedidos cuando la app está en segundo plano.',
-        positiveAction: 'Habilitar',
-        negativeAction: 'Cancelar',
-      ),
-      stopOnTerminate: false,
-      startOnBoot: true,
-      enableHeadless: true,
-      foregroundService: true,
-      notification: bg.Notification(
-        title: 'Remís Driver',
-        text: 'Disponible para pedidos',
-        smallIcon: 'drawable/ic_notification',
-        sticky: true,
-      ),
-      url: '${Env.supabaseUrl}/rest/v1/driver_current_location',
-      authorization: bg.Authorization(
-        strategy: 'JWT',
-        accessToken: session.accessToken,
-        refreshUrl: '${Env.supabaseUrl}/auth/v1/token?grant_type=refresh_token',
-        refreshToken: session.refreshToken ?? '',
-        refreshPayload: {'refresh_token': '{refreshToken}'},
-        expires: -1,
-      ),
-      headers: {
-        'apikey': Env.supabaseAnonKey,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates',
-      },
-      locationTemplate: '''
-      {
-        "driver_id": "${session.user.id}",
-        "location": "SRID=4326;POINT(<%= longitude %> <%= latitude %>)",
-        "heading": <%= heading %>,
-        "speed_mps": <%= speed %>,
-        "accuracy_m": <%= accuracy %>,
-        "battery_pct": <%= battery.level < 0 ? 0 : Math.round(battery.level * 100) %>,
-        "status": "available",
-        "updated_at": "<%= timestamp %>"
-      }
-      ''',
-      autoSync: true,
-      batchSync: true,
-      autoSyncThreshold: 5,
-      maxRecordsToPersist: 1000,
-      preventSuspend: true,
-      activityType: bg.Config.ACTIVITY_TYPE_AUTOMOTIVE_NAVIGATION,
-      debug: kDebugMode,
-      logLevel: kDebugMode
-          ? bg.Config.LOG_LEVEL_VERBOSE
-          : bg.Config.LOG_LEVEL_ERROR,
-    ));
+    _driverId = session.user.id;
+    _supabaseUrl = Env.supabaseUrl;
+    _supabaseAnonKey = Env.supabaseAnonKey;
+    _accessToken = session.accessToken;
     _ready = true;
   }
 
   static Future<void> start() async {
-    final state = await bg.BackgroundGeolocation.state;
-    if (!state.enabled) {
-      await bg.BackgroundGeolocation.start();
-    }
+    if (!_ready) return;
+
+    final locationSettings = AndroidSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 20,
+      foregroundNotificationConfig: ForegroundNotificationConfig(
+        notificationText: 'Disponible para pedidos',
+        notificationTitle: 'Remís Driver',
+        enableWakeLock: true,
+        notificationIcon: const AndroidResource(
+          name: 'ic_notification',
+          defType: 'drawable',
+        ),
+      ),
+    );
+
+    _positionSub = Geolocator.getPositionStream(
+      locationSettings: defaultTargetPlatform == TargetPlatform.android
+          ? locationSettings
+          : const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 20,
+            ),
+    ).listen((position) {
+      _positionController.add(position);
+      _syncLocation(position);
+    });
   }
 
-  static Future<void> stop() => bg.BackgroundGeolocation.stop();
-
-  static Future<bg.Location?> getCurrentLocation() async {
-    if (!_ready) return null;
+  static Future<void> _syncLocation(Position pos) async {
+    final url = _supabaseUrl;
+    final anonKey = _supabaseAnonKey;
+    final token = _accessToken;
+    final driverId = _driverId;
+    if (url == null || anonKey == null || token == null || driverId == null) {
+      return;
+    }
     try {
-      return await bg.BackgroundGeolocation.getCurrentPosition(
-        timeout: 30,
-        maximumAge: 5000,
-        desiredAccuracy: 10,
-        samples: 1,
+      await http.post(
+        Uri.parse('$url/rest/v1/driver_current_location'),
+        headers: {
+          'apikey': anonKey,
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates',
+        },
+        body: jsonEncode({
+          'driver_id': driverId,
+          'location': 'SRID=4326;POINT(${pos.longitude} ${pos.latitude})',
+          'heading': pos.heading,
+          'speed_mps': pos.speed,
+          'accuracy_m': pos.accuracy,
+          'battery_pct': 0,
+          'status': 'available',
+          'updated_at': pos.timestamp.toIso8601String(),
+        }),
+      );
+    } catch (_) {}
+  }
+
+  static Future<void> stop() async {
+    _positionSub?.cancel();
+    _positionSub = null;
+    _realtimeSub?.cancel();
+    _realtimeSub = null;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+    _ready = false;
+    _driverId = null;
+    _supabaseUrl = null;
+    _supabaseAnonKey = null;
+    _accessToken = null;
+  }
+
+  static Future<Position?> getCurrentLocation() async {
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 30),
+        ),
       );
     } catch (_) {
       return null;
@@ -98,16 +128,16 @@ class LocationService {
     required RealtimeClient realtime,
     required String driverId,
   }) {
-    bg.BackgroundGeolocation.onLocation((location) {
+    _realtimeSub = positionStream.listen((position) {
       realtime.channel('driver:locations').sendBroadcastMessage(
         event: 'pos',
         payload: {
           'driver_id': driverId,
-          'lat': location.coords.latitude,
-          'lng': location.coords.longitude,
-          'heading': location.coords.heading,
-          'speed_mps': location.coords.speed,
-          'recorded_at': location.timestamp,
+          'lat': position.latitude,
+          'lng': position.longitude,
+          'heading': position.heading,
+          'speed_mps': position.speed,
+          'recorded_at': position.timestamp.toIso8601String(),
         },
       );
     });
@@ -119,26 +149,31 @@ class LocationService {
     required String supabaseAnonKey,
     required String accessToken,
   }) {
-    bg.BackgroundGeolocation.onHeartbeat((_) async {
-      final loc = await getCurrentLocation();
-      await http.post(
-        Uri.parse('$supabaseUrl/functions/v1/driver-heartbeat'),
-        headers: {
-          'apikey': supabaseAnonKey,
-          'Authorization': 'Bearer $accessToken',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'driver_id': driverId,
-          'battery': loc?.battery.level ?? -1,
-          'status': 'available',
-          if (loc != null)
-            'last_known_location': {
-              'lat': loc.coords.latitude,
-              'lng': loc.coords.longitude,
+    _heartbeatTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) async {
+        final loc = await getCurrentLocation();
+        try {
+          await http.post(
+            Uri.parse('$supabaseUrl/functions/v1/driver-heartbeat'),
+            headers: {
+              'apikey': supabaseAnonKey,
+              'Authorization': 'Bearer $accessToken',
+              'Content-Type': 'application/json',
             },
-        }),
-      );
-    });
+            body: jsonEncode({
+              'driver_id': driverId,
+              'battery': -1,
+              'status': 'available',
+              if (loc != null)
+                'last_known_location': {
+                  'lat': loc.latitude,
+                  'lng': loc.longitude,
+                },
+            }),
+          );
+        } catch (_) {}
+      },
+    );
   }
 }

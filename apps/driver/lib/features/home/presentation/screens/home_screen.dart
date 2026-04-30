@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:remis_design_system/remis_design_system.dart';
 import 'package:remis_flutter_core/remis_flutter_core.dart';
@@ -250,7 +251,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
       final bgLoc = await LocationService.getCurrentLocation();
       if (bgLoc != null) {
-        target = LatLng(bgLoc.coords.latitude, bgLoc.coords.longitude);
+        target = LatLng(bgLoc.latitude, bgLoc.longitude);
       } else {
         final pos = await getCurrentPositionOrNull();
         if (pos != null) {
@@ -737,7 +738,7 @@ class _SOSDialogState extends State<_SOSDialog>
         final loc = await LocationService.getCurrentLocation();
         if (loc != null) {
           locationWkt =
-              'SRID=4326;POINT(${loc.coords.longitude} ${loc.coords.latitude})';
+              'SRID=4326;POINT(${loc.longitude} ${loc.latitude})';
         }
       } catch (_) {}
 

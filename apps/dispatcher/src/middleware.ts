@@ -1,11 +1,13 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const COOKIE_SIZE_LIMIT = 4096;
+// Node.js default max header size is 16KB total. Supabase JWTs in cookies
+// can easily hit 8–12KB. We clear and redirect well before Node rejects with 431.
+const COOKIE_BLOAT_THRESHOLD = 6144; // 6KB
 
 function hasBloatedCookies(request: NextRequest): boolean {
   const cookieHeader = request.headers.get('cookie') ?? '';
-  return cookieHeader.length > COOKIE_SIZE_LIMIT * 4;
+  return cookieHeader.length > COOKIE_BLOAT_THRESHOLD;
 }
 
 function clearSupabaseCookies(response: NextResponse): NextResponse {

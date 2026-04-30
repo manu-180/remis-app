@@ -137,14 +137,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.3.0"
-  background_fetch:
-    dependency: transitive
-    description:
-      name: background_fetch
-      sha256: "360697885b0a0d3d3045ee1e1dcce19486319b8cb9df2d0ef07518f737bebb31"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.6.2"
   battery_plus:
     dependency: "direct main"
     description:
@@ -361,14 +353,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.0.3"
-  disable_battery_optimization:
-    dependency: "direct main"
-    description:
-      name: disable_battery_optimization
-      sha256: "7fbda76cdd30d01d75e091db8869b8cf2fd4c7b7edef3abce0d7206569603051"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.1.2"
   fake_async:
     dependency: transitive
     description:
@@ -462,14 +446,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.5.2"
-  flutter_background_geolocation:
-    dependency: "direct main"
-    description:
-      name: flutter_background_geolocation
-      sha256: "2c5f23bf35837b31c4e1badadf7fb5da418a1862133b5a671b3e0bfa60c3bf2f"
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.18.3"
   flutter_lints:
     dependency: "direct dev"
     description:
@@ -569,7 +545,7 @@ packages:
     source: hosted
     version: "2.5.0"
   geolocator:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: geolocator
       sha256: f62bcd90459e63210bbf9c35deb6a51c521f992a78de19a1fe5c11704f9530e2

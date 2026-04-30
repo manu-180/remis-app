@@ -56,22 +56,11 @@
             android:name="flutterEmbedding"
             android:value="2"/>
 
-        <!-- Transistorsoft foreground services -->
+        <!-- Geolocator foreground service for background location tracking -->
         <service
-            android:name="com.transistorsoft.locationmanager.service.TrackingService"
+            android:name="com.baseflow.geolocator.ForegroundLocationService"
             android:foregroundServiceType="location"
             android:exported="false"/>
-        <service
-            android:name="com.transistorsoft.locationmanager.service.LocationRequestService"
-            android:foregroundServiceType="location"
-            android:exported="false"/>
-        <receiver
-            android:name="com.transistorsoft.locationmanager.util.BootReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED"/>
-            </intent-filter>
-        </receiver>
     </application>
 
     <queries>

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_background_geolocation/flutter_background_geolocation.dart' as bg;
+import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:remis_driver/features/onboarding/presentation/widgets/onboarding_scaffold.dart';
 import 'package:remis_driver/features/shift/data/location_service.dart';
@@ -21,6 +21,7 @@ class _State extends State<StepFunctionalTest> {
   int _countdown = 60;
   int _locationsReceived = 0;
   Timer? _timer;
+  StreamSubscription<Position>? _locationSub;
 
   Future<void> _startTest() async {
     final session = Supabase.instance.client.auth.currentSession;
@@ -54,7 +55,7 @@ class _State extends State<StepFunctionalTest> {
 
     await LocationService.start();
 
-    bg.BackgroundGeolocation.onLocation(_onTestLocation);
+    _locationSub = LocationService.positionStream.listen(_onTestLocation);
 
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) {
@@ -69,13 +70,14 @@ class _State extends State<StepFunctionalTest> {
     });
   }
 
-  void _onTestLocation(bg.Location location) {
-    if (!mounted || location.sample) return;
+  void _onTestLocation(Position position) {
+    if (!mounted) return;
     setState(() => _locationsReceived++);
   }
 
   Future<void> _evaluate() async {
-    bg.BackgroundGeolocation.removeListener(_onTestLocation);
+    _locationSub?.cancel();
+    _locationSub = null;
     await LocationService.stop();
     if (!mounted) return;
     setState(() {
@@ -88,7 +90,8 @@ class _State extends State<StepFunctionalTest> {
   Future<void> _reset() async {
     _timer?.cancel();
     _timer = null;
-    bg.BackgroundGeolocation.removeListener(_onTestLocation);
+    _locationSub?.cancel();
+    _locationSub = null;
     try {
       await LocationService.stop();
     } catch (_) {}
@@ -104,7 +107,7 @@ class _State extends State<StepFunctionalTest> {
   @override
   void dispose() {
     _timer?.cancel();
-    bg.BackgroundGeolocation.removeListener(_onTestLocation);
+    _locationSub?.cancel();
     unawaited(LocationService.stop());
     super.dispose();
   }

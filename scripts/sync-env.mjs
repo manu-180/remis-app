@@ -116,6 +116,12 @@ function writeNextEnv(targetPath, vars) {
   if (vars.SENTRY_DSN) {
     lines.push(`NEXT_PUBLIC_SENTRY_DSN=${vars.SENTRY_DSN}`);
   }
+  if (vars.NEXT_PUBLIC_POSTHOG_KEY) {
+    lines.push(`NEXT_PUBLIC_POSTHOG_KEY=${vars.NEXT_PUBLIC_POSTHOG_KEY}`);
+  }
+  if (vars.NEXT_PUBLIC_POSTHOG_HOST) {
+    lines.push(`NEXT_PUBLIC_POSTHOG_HOST=${vars.NEXT_PUBLIC_POSTHOG_HOST}`);
+  }
   const content = lines.join('\n') + '\n';
   if (checkOnly) return;
   mkdirSync(dirname(targetPath), { recursive: true });
