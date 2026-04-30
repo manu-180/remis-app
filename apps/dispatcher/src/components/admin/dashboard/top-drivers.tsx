@@ -52,6 +52,47 @@ function driverStatusLabel(status: DriverStatus): string {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Premium gradient avatars: deterministic hash(name) → palette
+// ---------------------------------------------------------------------------
+const AVATAR_PALETTES: Array<{ from: string; to: string; ring: string }> = [
+  { from: '#6366F1', to: '#8B5CF6', ring: 'rgba(139, 92, 246, 0.35)' }, // indigo → violet
+  { from: '#0EA5E9', to: '#22D3EE', ring: 'rgba(14, 165, 233, 0.35)' }, // sky → cyan
+  { from: '#14B8A6', to: '#10B981', ring: 'rgba(20, 184, 166, 0.35)' }, // teal → emerald
+  { from: '#F59E0B', to: '#EF4444', ring: 'rgba(239, 68, 68, 0.35)' },  // amber → red
+  { from: '#EC4899', to: '#F43F5E', ring: 'rgba(236, 72, 153, 0.35)' }, // pink → rose
+  { from: '#3B82F6', to: '#6366F1', ring: 'rgba(59, 130, 246, 0.35)' }, // blue → indigo
+  { from: '#8B5CF6', to: '#EC4899', ring: 'rgba(139, 92, 246, 0.35)' }, // violet → pink
+  { from: '#06B6D4', to: '#3B82F6', ring: 'rgba(6, 182, 212, 0.35)' },  // cyan → blue
+  { from: '#F97316', to: '#F59E0B', ring: 'rgba(249, 115, 22, 0.35)' }, // orange → amber
+  { from: '#10B981', to: '#06B6D4', ring: 'rgba(16, 185, 129, 0.35)' }, // emerald → cyan
+];
+
+function hashName(name: string): number {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash << 5) - hash + name.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function paletteFor(name: string): { from: string; to: string; ring: string } {
+  const idx = hashName(name) % AVATAR_PALETTES.length;
+  // Length is a non-empty literal, so this is always defined.
+  return AVATAR_PALETTES[idx] as { from: string; to: string; ring: string };
+}
+
+// URLs of demo/placeholder avatar services — ignore so we render premium
+// gradient initials instead. Real photos in Supabase Storage will pass through.
+const PLACEHOLDER_AVATAR_HOSTS = ['pravatar', 'dicebear', 'ui-avatars', 'gravatar'];
+
+function isPlaceholderAvatar(url: string | null): boolean {
+  if (!url) return true;
+  const lower = url.toLowerCase();
+  return PLACEHOLDER_AVATAR_HOSTS.some((host) => lower.includes(host));
+}
+
 interface AvatarProps {
   name: string;
   avatarUrl: string | null;
@@ -60,33 +101,64 @@ interface AvatarProps {
 }
 
 function DriverAvatar({ name, avatarUrl, size, isFirst }: AvatarProps) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const palette = paletteFor(name);
+  const useImage = avatarUrl && !isPlaceholderAvatar(avatarUrl) && !imgFailed;
+
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       {isFirst && (
-        <Crown
-          size={14}
-          className="absolute -top-1 -right-1 z-10"
-          style={{ color: 'var(--brand-accent)' }}
+        <span
+          aria-hidden
+          className="absolute inset-0 -m-[3px] rounded-full pointer-events-none"
+          style={{
+            background:
+              'conic-gradient(from 200deg, #FBBF24, #F59E0B, #FCD34D, #F59E0B, #FBBF24)',
+            padding: 3,
+            WebkitMask:
+              'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+            WebkitMaskComposite: 'xor',
+            maskComposite: 'exclude',
+            filter: 'drop-shadow(0 0 6px rgba(245, 158, 11, 0.45))',
+          }}
         />
       )}
       <div
-        className={cn(
-          'rounded-full bg-[var(--neutral-200)] flex items-center justify-center font-semibold text-[var(--neutral-700)] overflow-hidden',
-          isFirst && 'ring-2 ring-[var(--brand-accent)]'
-        )}
-        style={{ width: size, height: size, fontSize: size * 0.35 }}
+        className="relative rounded-full overflow-hidden flex items-center justify-center font-bold tracking-tight text-white select-none"
+        style={{
+          width: size,
+          height: size,
+          fontSize: size * 0.4,
+          background: useImage
+            ? 'transparent'
+            : `linear-gradient(135deg, ${palette.from} 0%, ${palette.to} 100%)`,
+          boxShadow: useImage
+            ? 'inset 0 0 0 1px rgba(255,255,255,0.08)'
+            : `0 1px 2px rgba(0,0,0,0.18), 0 6px 18px -4px ${palette.ring}, inset 0 1px 0 rgba(255,255,255,0.18)`,
+          textShadow: useImage ? 'none' : '0 1px 1px rgba(0,0,0,0.18)',
+        }}
       >
-        {avatarUrl ? (
+        {useImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={avatarUrl}
+            src={avatarUrl!}
             alt={name}
+            referrerPolicy="no-referrer"
+            onError={() => setImgFailed(true)}
             className="w-full h-full object-cover"
           />
         ) : (
-          initials(name)
+          <span style={{ letterSpacing: '-0.02em' }}>{initials(name)}</span>
         )}
       </div>
+      {isFirst && (
+        <Crown
+          size={Math.round(size * 0.32)}
+          aria-label="Top conductor"
+          className="absolute -top-2 -right-1.5 z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.35)]"
+          style={{ color: '#F59E0B', fill: '#FBBF24', transform: 'rotate(18deg)' }}
+        />
+      )}
     </div>
   );
 }
