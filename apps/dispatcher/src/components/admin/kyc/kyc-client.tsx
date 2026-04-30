@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ChevronDown, ChevronUp, Check, X, ImageOff } from 'lucide-react';
+import { ChevronDown, ChevronUp, Check, X, ImageOff, ShieldCheck, FileText, ScanFace, ClipboardCheck, Inbox } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useSupabaseQuery } from '@/hooks/use-supabase-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -312,14 +312,41 @@ export function KycClient() {
     ['kyc-list', version],
     async (sb) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await (sb as any)
+      const verResult = await (sb as any)
         .from('kyc_verifications')
-        .select('*, profiles(full_name, avatar_url)')
+        .select('*')
         .order('created_at', { ascending: false });
-      return {
-        data: (result.data ?? []) as KycRow[],
-        error: result.error,
-      };
+
+      if (verResult.error) {
+        return { data: [] as KycRow[], error: verResult.error };
+      }
+
+      const rows = (verResult.data ?? []) as Omit<KycRow, 'profiles'>[];
+      if (rows.length === 0) {
+        return { data: [] as KycRow[], error: null };
+      }
+
+      const driverIds = Array.from(new Set(rows.map((r) => r.driver_id)));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const profResult = await (sb as any)
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', driverIds);
+
+      const profilesById = new Map<string, { full_name: string | null; avatar_url: string | null }>(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ((profResult.data ?? []) as any[]).map((p) => [
+          p.id as string,
+          { full_name: p.full_name ?? null, avatar_url: p.avatar_url ?? null },
+        ]),
+      );
+
+      const merged: KycRow[] = rows.map((r) => ({
+        ...r,
+        profiles: profilesById.get(r.driver_id) ?? null,
+      }));
+
+      return { data: merged, error: null };
     },
   );
 
@@ -410,6 +437,96 @@ export function KycClient() {
   }
 
   // ---------------------------------------------------------------------------
+  // Premium empty state — no verifications at all
+  // ---------------------------------------------------------------------------
+  if (all.length === 0) {
+    return (
+      <Card className="overflow-hidden relative">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-60"
+          style={{ background: 'var(--gradient-glow)' }}
+        />
+        <CardContent className="relative py-16 px-6 lg:px-8">
+          <div className="flex flex-col items-center text-center max-w-xl mx-auto">
+            {/* Icon with gradient + glow */}
+            <div className="relative mb-6">
+              <div
+                aria-hidden
+                className="absolute -inset-3 rounded-full blur-2xl opacity-40"
+                style={{ background: 'var(--gradient-brand)' }}
+              />
+              <div
+                className="relative h-20 w-20 rounded-full flex items-center justify-center shadow-[var(--shadow-lg)]"
+                style={{ background: 'var(--gradient-brand)' }}
+              >
+                <ShieldCheck size={38} className="text-white" strokeWidth={2.2} />
+              </div>
+            </div>
+
+            <h3 className="text-xl font-semibold text-[var(--neutral-900)] mb-2 tracking-tight">
+              Sin verificaciones de identidad todavía
+            </h3>
+            <p className="text-sm text-[var(--neutral-500)] leading-relaxed mb-8 max-w-md">
+              Cuando los conductores completen su verificación KYC mediante
+              {' '}<span className="font-medium text-[var(--neutral-700)]">Didit</span> o
+              {' '}<span className="font-medium text-[var(--neutral-700)]">AWS Rekognition</span>,
+              las solicitudes aparecerán aquí para tu revisión y aprobación.
+            </p>
+
+            {/* Process steps */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
+              {[
+                {
+                  icon: FileText,
+                  step: '01',
+                  title: 'Solicitud',
+                  desc: 'El conductor inicia el proceso desde la app móvil.',
+                },
+                {
+                  icon: ScanFace,
+                  step: '02',
+                  title: 'Validación',
+                  desc: 'El proveedor analiza documentos y biometría.',
+                },
+                {
+                  icon: ClipboardCheck,
+                  step: '03',
+                  title: 'Revisión',
+                  desc: 'Aprobás o rechazás la verificación desde este panel.',
+                },
+              ].map(({ icon: Icon, step, title, desc }) => (
+                <div
+                  key={step}
+                  className="rounded-[var(--radius-lg)] border border-[var(--neutral-200)] bg-[var(--neutral-50)] p-4 text-left transition-all hover:border-[var(--neutral-300)] hover:shadow-[var(--shadow-sm)]"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--neutral-0)] border border-[var(--neutral-200)]">
+                      <Icon size={14} className="text-[var(--brand-primary)]" />
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-[var(--neutral-400)] tracking-wider">
+                      {step}
+                    </span>
+                  </div>
+                  <p className="text-sm font-semibold text-[var(--neutral-900)] mb-1">{title}</p>
+                  <p className="text-xs text-[var(--neutral-500)] leading-relaxed">{desc}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Subtle hint */}
+            <p className="mt-8 text-xs text-[var(--neutral-400)]">
+              Tip: configurá el proveedor de KYC en{' '}
+              <span className="font-medium text-[var(--neutral-600)]">Settings → Integraciones</span>
+              {' '}si aún no lo hiciste.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // Tab label with count
   // ---------------------------------------------------------------------------
   function TabLabel({ label, count }: { label: string; count: number }) {
@@ -420,6 +537,19 @@ export function KycClient() {
           {count}
         </span>
       </span>
+    );
+  }
+
+  function TabEmptyState({ label }: { label: string }) {
+    return (
+      <Card>
+        <CardContent className="py-12 flex flex-col items-center text-center gap-3">
+          <div className="h-12 w-12 rounded-full bg-[var(--neutral-100)] flex items-center justify-center">
+            <Inbox size={20} className="text-[var(--neutral-400)]" />
+          </div>
+          <p className="text-sm text-[var(--neutral-500)]">No hay verificaciones {label}.</p>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -443,11 +573,7 @@ export function KycClient() {
       {/* ── PENDIENTES ── */}
       <TabsContent value="pending">
         {pending.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center text-sm text-[var(--neutral-500)]">
-              No hay verificaciones pendientes.
-            </CardContent>
-          </Card>
+          <TabEmptyState label="pendientes" />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {pending.map((row) => (
@@ -460,11 +586,7 @@ export function KycClient() {
       {/* ── APROBADOS ── */}
       <TabsContent value="approved">
         {approved.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center text-sm text-[var(--neutral-500)]">
-              No hay verificaciones aprobadas.
-            </CardContent>
-          </Card>
+          <TabEmptyState label="aprobadas" />
         ) : (
           <DataTable
             columns={historyColumns}
@@ -481,11 +603,7 @@ export function KycClient() {
       {/* ── RECHAZADOS ── */}
       <TabsContent value="rejected">
         {rejected.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center text-sm text-[var(--neutral-500)]">
-              No hay verificaciones rechazadas.
-            </CardContent>
-          </Card>
+          <TabEmptyState label="rechazadas" />
         ) : (
           <DataTable
             columns={historyColumns}
@@ -502,11 +620,7 @@ export function KycClient() {
       {/* ── VENCIDOS ── */}
       <TabsContent value="expired">
         {expired.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center text-sm text-[var(--neutral-500)]">
-              No hay verificaciones vencidas.
-            </CardContent>
-          </Card>
+          <TabEmptyState label="vencidas" />
         ) : (
           <DataTable
             columns={historyColumns}
