@@ -89,7 +89,7 @@ function isPlaceholderUrl(url: string | null | undefined): boolean {
 
 interface UserAvatarProps {
   name: string;
-  src?: string | null;
+  src?: string | null | undefined;
   size?: UserAvatarSize;
   /** Tailwind ring class: `'ring-[var(--success)]'` etc. */
   ringClass?: string;

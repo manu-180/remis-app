@@ -28,6 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { UserAvatar } from '@/components/ui/user-avatar';
 import { useConfirm } from '@/components/admin/confirm-dialog';
 
 // ---------------------------------------------------------------------------
@@ -183,24 +184,17 @@ function DetailDrawer({ passenger, open, onOpenChange, onUpdated }: DetailDrawer
 
   const profile = passenger.profiles;
   const name = profile?.full_name ?? 'Sin nombre';
-  const initials = name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange} title="Detalle del pasajero" width="lg">
       {/* Header */}
       <div className="flex items-start gap-4 pb-6 border-b border-[var(--neutral-200)]">
-        {profile?.avatar_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={profile.avatar_url}
-            alt={name}
-            className="w-10 h-10 rounded-full object-cover shrink-0"
-          />
-        ) : (
-          <span className="flex w-10 h-10 shrink-0 items-center justify-center rounded-full bg-[var(--brand-primary)] text-[var(--neutral-0)] text-sm font-semibold">
-            {initials}
-          </span>
-        )}
+        <UserAvatar
+          size="md"
+          name={name}
+          src={profile?.avatar_url}
+          seed={passenger.id}
+        />
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-[var(--neutral-900)] truncate">{name}</p>
           {profile?.phone && (
@@ -619,21 +613,13 @@ export function PassengersClient() {
         const src = p.profiles?.avatar_url ?? null;
         const name = p.profiles?.full_name ?? 'Sin nombre';
         const phone = p.profiles?.phone ?? '';
-        const initials = name.trim().split(/\s+/).slice(0, 2).map((w: string) => w[0]?.toUpperCase() ?? '').join('');
         const isBlacklisted = p.blacklisted;
         return (
           <div
             className="flex items-center gap-2.5 transition-all duration-300"
             style={isBlacklisted ? { borderLeft: '4px solid var(--danger)', paddingLeft: '8px' } : { paddingLeft: '0px' }}
           >
-            {src ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={src} alt={name} className="h-7 w-7 rounded-full object-cover shrink-0" />
-            ) : (
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--brand-primary)] text-[var(--neutral-0)] text-[10px] font-semibold">
-                {initials}
-              </span>
-            )}
+            <UserAvatar size="sm" name={name} src={src} seed={p.id} />
             <div className="min-w-0">
               <p className="font-medium truncate text-[var(--neutral-900)]">{name}</p>
               {phone && <p className="text-xs text-[var(--neutral-500)] truncate">{phone}</p>}
