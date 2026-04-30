@@ -9,10 +9,11 @@ import { StatusPill } from '@/components/ui/status-pill';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useConfirm } from '@/components/admin/confirm-dialog';
 import { PageBack } from '@/components/admin/page-back';
-import { initials, formatPhone, relativeTime } from '@/lib/format';
+import { formatPhone, relativeTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { toast } from '@/components/ui/use-toast';
+import { UserAvatar } from '@/components/ui/user-avatar';
 import { mapDriverStatus } from './drivers-list-client';
 import { DriverFormDrawer } from './driver-form-drawer';
 import { DriverTabResumen } from './tabs/tab-resumen';
@@ -261,26 +262,13 @@ export function DriverProfileClient({ driver: initialDriver }: { driver: DriverW
         />
         <CardContent className="relative pt-6 flex items-start gap-6 flex-wrap">
           {/* Avatar */}
-          <div
-            className={cn(
-              'w-24 h-24 rounded-full ring-4 flex items-center justify-center',
-              'bg-[var(--neutral-200)] text-2xl font-bold shrink-0 overflow-hidden',
-              ringColor,
-            )}
-          >
-            {driver.profiles.avatar_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={driver.profiles.avatar_url}
-                className="w-full h-full object-cover"
-                alt={driver.profiles.full_name ?? 'Avatar'}
-              />
-            ) : (
-              <span className="text-[var(--neutral-600)]">
-                {initials(driver.profiles.full_name ?? '')}
-              </span>
-            )}
-          </div>
+          <UserAvatar
+            size="xl"
+            name={driver.profiles.full_name ?? 'Sin nombre'}
+            src={driver.profiles.avatar_url}
+            ringClass={ringColor}
+            seed={driver.id}
+          />
 
           {/* Info */}
           <div className="flex-1 min-w-0">

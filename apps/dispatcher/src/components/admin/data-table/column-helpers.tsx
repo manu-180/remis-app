@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { MoreVertical } from 'lucide-react';
 import { StatusPill, type PillVariant } from '@/components/ui/status-pill';
+import { UserAvatar } from '@/components/ui/user-avatar';
 import { cn } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
@@ -133,32 +134,10 @@ export function createAvatarColumn<T>(
     cell: ({ row }) => {
       const src = getAvatar(row.original);
       const name = getName(row.original);
-      const initials = name
-        .trim()
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((w) => w[0]?.toUpperCase() ?? '')
-        .join('');
 
       return (
         <div className="flex items-center gap-2.5">
-          {src ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={src}
-              alt={name}
-              className="h-7 w-7 rounded-full object-cover shrink-0"
-            />
-          ) : (
-            <span
-              className={cn(
-                'flex h-7 w-7 shrink-0 items-center justify-center rounded-full',
-                'bg-[var(--brand-primary)] text-[var(--neutral-0)] text-[10px] font-semibold',
-              )}
-            >
-              {initials}
-            </span>
-          )}
+          <UserAvatar size="sm" name={name} src={src} />
           <span className="truncate font-medium">{name}</span>
         </div>
       );
