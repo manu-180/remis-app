@@ -2121,17 +2121,25 @@ export type Database = {
         Args: { p_token: string }
         Returns: {
           dest_address: string
+          dest_lat: number
+          dest_lng: number
+          driver_first_name: string
           driver_heading: number
+          driver_id: string
           driver_lat: number
           driver_lng: number
           driver_mobile: string
-          driver_name: string
           expires_at: string
           pickup_address: string
+          pickup_lat: number
+          pickup_lng: number
+          requested_at: string
           ride_id: string
           started_at: string
           status: Database["public"]["Enums"]["ride_status"]
           vehicle_color: string
+          vehicle_make: string
+          vehicle_model: string
           vehicle_plate: string
         }[]
       }
