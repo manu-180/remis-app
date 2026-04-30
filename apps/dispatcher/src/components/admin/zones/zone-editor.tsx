@@ -1,10 +1,30 @@
 'use client';
 
-import { useRef, useEffect, useReducer, useCallback } from 'react';
+import { useRef, useEffect, useReducer, useCallback, useState } from 'react';
 import Map, { Source, Layer, Marker } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { MapMouseEvent, MapRef } from 'react-map-gl/maplibre';
 import type { TariffZone } from '@/hooks/use-zones';
+
+function useMapTheme() {
+  const [isDark, setIsDark] = useState(true);
+
+  useEffect(() => {
+    const update = () => {
+      setIsDark(document.documentElement.dataset.theme !== 'light');
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
+  return {
+    mapStyle: isDark ? '/map-style-dark.json' : '/map-style-light.json',
+    labelColor: isDark ? '#ffffff' : '#1B2A4E',
+    labelHaloColor: isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.85)',
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -110,6 +130,7 @@ export function ZoneEditorInner({
 }: ZoneEditorInnerProps) {
   const mapRef = useRef<MapRef>(null);
   const justDoubleClickedRef = useRef(false);
+  const { mapStyle, labelColor, labelHaloColor } = useMapTheme();
 
   const [editorState, dispatch] = useReducer(editorReducer, { type: 'idle' });
 
@@ -290,7 +311,7 @@ export function ZoneEditorInner({
         ref={mapRef}
         initialViewState={{ longitude: -64.3, latitude: -36.625, zoom: 12 }}
         style={{ width: '100%', height: '100%' }}
-        mapStyle="/map-style-dark.json"
+        mapStyle={mapStyle}
         attributionControl={false}
         onClick={handleMapClick}
         onDblClick={handleMapDblClick}
@@ -324,8 +345,8 @@ export function ZoneEditorInner({
               'text-anchor': 'center',
             }}
             paint={{
-              'text-color': '#ffffff',
-              'text-halo-color': 'rgba(0,0,0,0.7)',
+              'text-color': labelColor,
+              'text-halo-color': labelHaloColor,
               'text-halo-width': 1.5,
             }}
           />
