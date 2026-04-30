@@ -16,8 +16,9 @@ export async function GET() {
       ts: new Date().toISOString(),
     });
   } catch (e) {
+    console.error('[health]', e);
     return NextResponse.json(
-      { status: 'error', supabase: 'unreachable', error: String(e) },
+      { status: 'error', supabase: 'unreachable' },
       { status: 503 },
     );
   }

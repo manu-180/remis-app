@@ -15,7 +15,7 @@ export default async function AdminDashboardPage({
     .from('profiles')
     .select('full_name')
     .eq('id', user?.id ?? '')
-    .single();
+    .maybeSingle();
   const profile = profileRes.data as { full_name?: string } | null;
 
   const params = await searchParams;

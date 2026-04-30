@@ -19,6 +19,7 @@ import { Stat } from '@/components/ui/stat';
 import { StatusPill } from '@/components/ui/status-pill';
 import type { PillVariant } from '@/components/ui/status-pill';
 import { formatARS } from '@/lib/format';
+import { escapeOrFilter } from '@/lib/postgrest-safe';
 
 // ---------------------------------------------------------------------------
 // Status mapping
@@ -200,7 +201,8 @@ export function RidesListClient() {
         query = query.in('payment_method', paymentFilter);
       }
       if (q) {
-        query = query.or(`pickup_address.ilike.%${q}%,dest_address.ilike.%${q}%`);
+        const safe = escapeOrFilter(q);
+        query = query.or(`pickup_address.ilike.%${safe}%,dest_address.ilike.%${safe}%`);
       }
 
       const result = await query;

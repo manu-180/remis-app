@@ -537,8 +537,13 @@ export function DriverFormDrawer({
     }
     setSubmitLoading(true);
     try {
-      const session = await sb.auth.getSession();
-      const token = session.data.session?.access_token;
+      const { data: { session } } = await sb.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        toast.error('Tu sesion expiro. Refresca la pagina.');
+        setSubmitLoading(false);
+        return;
+      }
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
       const resp = await fetch(`${supabaseUrl}/functions/v1/admin-create-driver`, {

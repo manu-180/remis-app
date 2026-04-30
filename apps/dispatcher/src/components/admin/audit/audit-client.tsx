@@ -5,6 +5,7 @@
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { z } from 'zod';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
   AlertTriangle,
@@ -38,10 +39,13 @@ type AuditLog = {
   created_at: string;
 };
 
-type ChainEntry = {
-  mismatch?: boolean;
-  [key: string]: unknown;
-};
+const chainEntrySchema = z
+  .object({
+    mismatch: z.boolean().optional(),
+  })
+  .passthrough();
+const chainDataSchema = z.array(chainEntrySchema);
+type ChainEntry = z.infer<typeof chainEntrySchema>;
 
 type AuditData = {
   logs: AuditLog[];
@@ -123,15 +127,27 @@ export function AuditClient() {
           .order('created_at', { ascending: false })
           .limit(500),
         (sb as any).rpc('audit_log_hash_chain').then(
-          (r: { data: ChainEntry[] | null; error: unknown }) => r,
+          (r: { data: unknown; error: unknown }) => r,
         ).catch(() => ({ data: null, error: new Error('rpc error') })),
       ]);
+
+      let chainData: ChainEntry[] | null = null;
+      let chainShapeError = false;
+      if (chainResult.data != null) {
+        const parsed = chainDataSchema.safeParse(chainResult.data);
+        if (parsed.success) {
+          chainData = parsed.data;
+        } else {
+          chainShapeError = true;
+          console.error('[audit] chain shape inesperado:', parsed.error.flatten());
+        }
+      }
 
       return {
         data: {
           logs: (logsResult.data ?? []) as AuditLog[],
-          chainData: chainResult.data as ChainEntry[] | null,
-          chainError: !!chainResult.error,
+          chainData,
+          chainError: !!chainResult.error || chainShapeError,
         },
         error: logsResult.error,
       };

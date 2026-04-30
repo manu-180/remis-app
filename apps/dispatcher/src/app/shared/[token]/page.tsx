@@ -2,6 +2,24 @@ export const dynamic = 'force-dynamic';
 
 import { getSupabaseServerClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
+import { z } from 'zod';
+
+const sharedTripSchema = z.object({
+  ride_id: z.string(),
+  status: z.string(),
+  pickup_address: z.string().nullable(),
+  dest_address: z.string().nullable(),
+  driver_name: z.string().nullable(),
+  driver_avatar_url: z.string().nullable(),
+  vehicle_plate: z.string().nullable(),
+  vehicle_make: z.string().nullable(),
+  vehicle_model: z.string().nullable(),
+  driver_rating: z.number().nullable(),
+  eta_minutes: z.number().nullable(),
+  shared_by_name: z.string().nullable(),
+});
+
+type SharedTrip = z.infer<typeof sharedTripSchema>;
 
 export default async function SharedTripPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -14,7 +32,12 @@ export default async function SharedTripPage({ params }: { params: Promise<{ tok
     if (error || !data) {
       notFound();
     }
-    trip = data as SharedTrip;
+    const parsed = sharedTripSchema.safeParse(data);
+    if (!parsed.success) {
+      console.error('[shared-trip] shape inesperado:', parsed.error.flatten());
+      notFound();
+    }
+    trip = parsed.data;
   } catch {
     notFound();
   }
@@ -122,19 +145,4 @@ function formatStatus(status: string): string {
     cancelled_by_driver: 'Cancelado',
   };
   return map[status] ?? status;
-}
-
-interface SharedTrip {
-  ride_id: string;
-  status: string;
-  pickup_address: string | null;
-  dest_address: string | null;
-  driver_name: string | null;
-  driver_avatar_url: string | null;
-  vehicle_plate: string | null;
-  vehicle_make: string | null;
-  vehicle_model: string | null;
-  driver_rating: number | null;
-  eta_minutes: number | null;
-  shared_by_name: string | null;
 }

@@ -6,6 +6,7 @@ import { Plus, Eye, Pencil, Ban, Users, Wifi, Car, AlertOctagon } from 'lucide-r
 import type { ColumnDef } from '@tanstack/react-table';
 import { useSupabaseQuery } from '@/hooks/use-supabase-query';
 import { useRealtimeTable } from '@/hooks/use-realtime-table';
+import { escapeOrFilter } from '@/lib/postgrest-safe';
 import {
   DataTable,
   FilterBar,
@@ -141,8 +142,9 @@ export function DriversListClient() {
         .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
       if (q) {
+        const safe = escapeOrFilter(q);
         query = query.or(
-          `profiles.full_name.ilike.%${q}%,profiles.phone.ilike.%${q}%`,
+          `profiles.full_name.ilike.%${safe}%,profiles.phone.ilike.%${safe}%`,
         );
       }
       if (statusFilter.length > 0) {
