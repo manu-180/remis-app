@@ -13,6 +13,12 @@ import {
   Car,
   MessageSquare,
   ExternalLink,
+  Send,
+  Mail,
+  MessageCircle,
+  Smartphone,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -22,7 +28,6 @@ import { reverseGeocode } from '@/lib/geocode';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { StatusPill } from '@/components/ui/status-pill';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
 import {
@@ -52,6 +57,16 @@ type PriorLocation =
   | { latitude: number; longitude: number }
   | GeoPoint;
 
+type NotificationLogEntry = {
+  timestamp: string;
+  channel: 'email' | 'sms' | 'telegram';
+  recipient: string;
+  status: 'sent' | 'pending_provider' | 'failed';
+  message?: string;
+};
+
+type ResolutionOutcome = 'resolved' | 'false_alarm' | 'escalated_to_911' | 'other';
+
 type SosEvent = {
   id: string;
   ride_id: string | null;
@@ -63,7 +78,9 @@ type SosEvent = {
   passenger_snapshot: Record<string, unknown> | null;
   vehicle_snapshot: Record<string, unknown> | null;
   dispatched_to_dispatcher: boolean | null;
-  external_contacts_notified: unknown | null;
+  dispatched_at: string | null;
+  dispatched_by: string | null;
+  external_contacts_notified: NotificationLogEntry[] | null;
   resolved_at: string | null;
   resolved_by: string | null;
   resolution_notes: string | null;
@@ -74,6 +91,9 @@ type SosEvent = {
     avatar_url: string | null;
   } | null;
   resolver: {
+    full_name: string | null;
+  } | null;
+  dispatcher: {
     full_name: string | null;
   } | null;
 };
@@ -87,13 +107,26 @@ type AuditLog = {
   profiles: { full_name: string | null } | null;
 };
 
+type StaffContact = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
+  role: string;
+};
+
+type ContactSelection = Record<
+  string,
+  { email: boolean; sms: boolean; telegram: boolean }
+>;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 function extractCoords(loc: PriorLocation): [number, number] | null {
   if (!loc) return null;
   if ('coordinates' in loc && Array.isArray(loc.coordinates)) {
-    return [loc.coordinates[0], loc.coordinates[1]]; // [lng, lat]
+    return [loc.coordinates[0], loc.coordinates[1]];
   }
   if ('lng' in loc && 'lat' in loc) return [loc.lng, loc.lat];
   if ('longitude' in loc && 'latitude' in loc) return [loc.longitude, loc.latitude];
@@ -109,6 +142,24 @@ function formatDuration(start: string, end: string): string {
 
 function shortId(id: string): string {
   return id.slice(0, 8).toUpperCase();
+}
+
+function channelIcon(channel: NotificationLogEntry['channel']) {
+  switch (channel) {
+    case 'email':    return <Mail size={13} />;
+    case 'sms':      return <Smartphone size={13} />;
+    case 'telegram': return <MessageCircle size={13} />;
+    default:         return <Send size={13} />;
+  }
+}
+
+function channelLabel(channel: NotificationLogEntry['channel']) {
+  switch (channel) {
+    case 'email':    return 'Email';
+    case 'sms':      return 'SMS';
+    case 'telegram': return 'Telegram';
+    default:         return channel;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +226,6 @@ function SosMapInner({
   lat: number;
   priorLocations: PriorLocation[] | null;
 }) {
-  // Build trail GeoJSON from prior_locations
   const trailCoords: [number, number][] = [];
   if (priorLocations && priorLocations.length > 0) {
     for (const loc of priorLocations) {
@@ -183,7 +233,7 @@ function SosMapInner({
       if (coords) trailCoords.push(coords);
     }
   }
-  trailCoords.push([lng, lat]); // add the SOS point at the end
+  trailCoords.push([lng, lat]);
 
   const trailData =
     trailCoords.length >= 2
@@ -205,7 +255,6 @@ function SosMapInner({
         mapStyle={env.NEXT_PUBLIC_MAPLIBRE_STYLE_URL}
         style={{ width: '100%', height: '100%' }}
       >
-        {/* Trail polyline */}
         {trailData && (
           <>
             <Source id="sos-trail" type="geojson" data={trailData} />
@@ -230,12 +279,10 @@ function SosMapInner({
           </>
         )}
 
-        {/* SOS marker */}
         <Marker longitude={lng} latitude={lat} anchor="center">
           <SosDot />
         </Marker>
 
-        {/* Trail start marker (if we have prior locations) */}
         {trailCoords.length >= 2 && trailCoords[0] !== undefined && (
           <Marker longitude={trailCoords[0][0]!} latitude={trailCoords[0][1]!} anchor="center">
             <div
@@ -370,14 +417,32 @@ interface SosDetailClientProps {
   sosId: string;
 }
 
+const RESOLUTION_OPTIONS: { value: ResolutionOutcome; label: string }[] = [
+  { value: 'resolved',           label: 'Resuelto sin incidente' },
+  { value: 'false_alarm',        label: 'Falsa alarma' },
+  { value: 'escalated_to_911',   label: 'Escalado al 911' },
+  { value: 'other',              label: 'Otro' },
+];
+
 export function SosDetailClient({ sosId }: SosDetailClientProps) {
   const router = useRouter();
   const [showResolveDialog, setShowResolveDialog] = useState(false);
   const [resolveNotes, setResolveNotes] = useState('');
+  const [resolveOutcome, setResolveOutcome] = useState<ResolutionOutcome>('resolved');
   const [resolving, setResolving] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [addingNote, setAddingNote] = useState(false);
   const [address, setAddress] = useState<string | null>(null);
+
+  // 911 desktop dialog
+  const [show911Dialog, setShow911Dialog] = useState(false);
+  const [copied911, setCopied911] = useState(false);
+
+  // Notify contacts dialog
+  const [showNotifyDialog, setShowNotifyDialog] = useState(false);
+  const [contactSelection, setContactSelection] = useState<ContactSelection>({});
+  const [notifyMessage, setNotifyMessage] = useState('');
+  const [notifying, setNotifying] = useState(false);
 
   // Main SOS query
   const { data: sos, isLoading, refetch } = useSupabaseQuery<SosEvent>(
@@ -389,7 +454,8 @@ export function SosDetailClient({ sosId }: SosDetailClientProps) {
         .select(
           `*,
           triggered_profile:profiles!sos_events_triggered_by_fkey(full_name, phone, avatar_url),
-          resolver:profiles!sos_events_resolved_by_fkey(full_name)`,
+          resolver:profiles!sos_events_resolved_by_fkey(full_name),
+          dispatcher:profiles!sos_events_dispatched_by_fkey(full_name)`,
         )
         .eq('id', sosId)
         .single();
@@ -405,10 +471,24 @@ export function SosDetailClient({ sosId }: SosDetailClientProps) {
       const { data, error } = await (sb as any)
         .from('audit_log')
         .select('*, profiles!audit_log_actor_id_fkey(full_name)')
-        .eq('entity_type', 'sos_events')
+        .eq('entity', 'sos_events')
         .eq('entity_id', sosId)
         .order('created_at', { ascending: true });
       return { data: data ?? [], error };
+    },
+  );
+
+  // Staff contacts (admin/dispatcher) for notification dialog
+  const { data: staffContacts } = useSupabaseQuery<StaffContact[]>(
+    ['sos-staff-contacts'],
+    async (sb) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (sb as any)
+        .from('profiles')
+        .select('id, full_name, email, phone, role')
+        .in('role', ['admin', 'dispatcher'])
+        .order('full_name', { ascending: true });
+      return { data: (data ?? []) as StaffContact[], error };
     },
   );
 
@@ -440,10 +520,15 @@ export function SosDetailClient({ sosId }: SosDetailClientProps) {
   // Handlers
   // ---------------------------------------------------------------------------
   const handleMarkAttending = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any)
       .from('sos_events')
-      .update({ dispatched_to_dispatcher: true })
+      .update({
+        dispatched_to_dispatcher: true,
+        dispatched_at: new Date().toISOString(),
+        dispatched_by: user?.id,
+      })
       .eq('id', sosId);
     if (error) {
       toast.error('Error al actualizar estado');
@@ -454,17 +539,29 @@ export function SosDetailClient({ sosId }: SosDetailClientProps) {
   };
 
   const handleResolve = async () => {
-    if (!resolveNotes.trim()) return;
+    if (!resolveNotes.trim() || resolveNotes.trim().length < 10) {
+      toast.error('Las notas de resolución son obligatorias (mín. 10 caracteres)');
+      return;
+    }
+
+    // Special case: escalated_to_911 doesn't resolve, opens instructions
+    if (resolveOutcome === 'escalated_to_911') {
+      setShowResolveDialog(false);
+      setShow911Dialog(true);
+      return;
+    }
+
     setResolving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      const notes = `[${resolveOutcome}] ${resolveNotes.trim()}`;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (supabase as any)
         .from('sos_events')
         .update({
           resolved_at: new Date().toISOString(),
           resolved_by: user?.id,
-          resolution_notes: resolveNotes.trim(),
+          resolution_notes: notes,
         })
         .eq('id', sosId);
       if (error) {
@@ -486,7 +583,7 @@ export function SosDetailClient({ sosId }: SosDetailClientProps) {
       const { data: { user } } = await supabase.auth.getUser();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (supabase as any).from('audit_log').insert({
-        entity_type: 'sos_events',
+        entity: 'sos_events',
         entity_id: sosId,
         action: 'note',
         actor_id: user?.id,
@@ -501,6 +598,90 @@ export function SosDetailClient({ sosId }: SosDetailClientProps) {
     } finally {
       setAddingNote(false);
     }
+  };
+
+  const handleNotifyContacts = async () => {
+    const emails: string[] = [];
+    const smsNumbers: string[] = [];
+    let telegram = false;
+
+    for (const [contactId, sel] of Object.entries(contactSelection)) {
+      const contact = staffContacts?.find((c) => c.id === contactId);
+      if (!contact) continue;
+      if (sel.email && contact.email) emails.push(contact.email);
+      if (sel.sms && contact.phone) smsNumbers.push(contact.phone);
+      if (sel.telegram) telegram = true;
+    }
+
+    if (emails.length === 0 && smsNumbers.length === 0 && !telegram) {
+      toast.error('Seleccioná al menos un canal de contacto.');
+      return;
+    }
+
+    setNotifying(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const fnUrl = `${env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/notify-sos-contacts`;
+      const res = await fetch(fnUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token ?? ''}`,
+        },
+        body: JSON.stringify({
+          sos_id: sosId,
+          channels: { email: emails, sms: smsNumbers, telegram },
+          message: notifyMessage.trim() || undefined,
+        }),
+      });
+
+      const result = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        toast.error(result?.error ?? 'Error al notificar contactos');
+        return;
+      }
+
+      const sent = result?.sent ?? 0;
+      const pending = result?.pending ?? 0;
+      toast.success(
+        pending > 0
+          ? `Notificación registrada (${sent} enviadas, ${pending} pendientes de provider)`
+          : `Notificación enviada a ${sent} canales`,
+      );
+      setShowNotifyDialog(false);
+      setContactSelection({});
+      setNotifyMessage('');
+      refetch();
+    } catch (e) {
+      toast.error('No se pudo conectar con el servicio de notificaciones');
+      console.error('[notify-sos-contacts]', e);
+    } finally {
+      setNotifying(false);
+    }
+  };
+
+  const handleCopy911 = async () => {
+    try {
+      await navigator.clipboard.writeText('911');
+      setCopied911(true);
+      setTimeout(() => setCopied911(false), 1500);
+    } catch {
+      toast.error('No se pudo copiar');
+    }
+  };
+
+  const toggleContactChannel = (
+    contactId: string,
+    channel: 'email' | 'sms' | 'telegram',
+  ) => {
+    setContactSelection((prev) => {
+      const current = prev[contactId] ?? { email: false, sms: false, telegram: false };
+      return {
+        ...prev,
+        [contactId]: { ...current, [channel]: !current[channel] },
+      };
+    });
   };
 
   // ---------------------------------------------------------------------------
@@ -534,7 +715,6 @@ export function SosDetailClient({ sosId }: SosDetailClientProps) {
   const hasLocation = sos.location != null;
   const isResolved = sos.resolved_at != null;
 
-  // Driver phone from snapshot or triggered profile
   const driverPhone =
     (sos.driver_snapshot?.phone as string | undefined) ??
     (sos.triggered_role === 'driver' ? sos.triggered_profile?.phone : undefined);
@@ -542,6 +722,10 @@ export function SosDetailClient({ sosId }: SosDetailClientProps) {
   const passengerPhone =
     (sos.passenger_snapshot?.phone as string | undefined) ??
     (sos.triggered_role === 'passenger' ? sos.triggered_profile?.phone : undefined);
+
+  const notifications = Array.isArray(sos.external_contacts_notified)
+    ? sos.external_contacts_notified
+    : [];
 
   // ---------------------------------------------------------------------------
   // Render
@@ -608,6 +792,23 @@ export function SosDetailClient({ sosId }: SosDetailClientProps) {
               </p>
             )}
 
+            {/* Dispatched indicator */}
+            {sos.dispatched_to_dispatcher && sos.dispatched_at && !isResolved && (
+              <p className="text-sm opacity-90 mt-2 bg-white/10 rounded-lg px-3 py-1.5 inline-block">
+                <Clock size={13} className="inline mr-1.5 -mt-0.5" />
+                Atendido por{' '}
+                <strong>{sos.dispatcher?.full_name ?? 'Despachador'}</strong>
+                {' '}a las{' '}
+                <strong>{format(new Date(sos.dispatched_at), 'HH:mm', { locale: es })}</strong>
+                {' '}(
+                {formatDistanceToNow(new Date(sos.dispatched_at), {
+                  addSuffix: true,
+                  locale: es,
+                })}
+                )
+              </p>
+            )}
+
             {isResolved && sos.resolver && (
               <p className="text-sm opacity-80 mt-1">
                 Resuelto por <strong>{sos.resolver.full_name}</strong>{' '}
@@ -637,13 +838,21 @@ export function SosDetailClient({ sosId }: SosDetailClientProps) {
             </Button>
           )}
 
-          <Button
-            variant="secondary"
-            className="h-11 bg-white/20 text-white hover:bg-white/30 border-white/30"
-            onClick={() => window.open('tel:911')}
+          {/* 911 button: tel:911 on mobile (md:hidden), dialog on desktop (hidden md:inline-flex) */}
+          <a
+            href="tel:911"
+            className="md:hidden h-11 inline-flex items-center px-4 rounded-[var(--radius-md)] bg-white/20 hover:bg-white/30 border border-white/30 text-white text-sm font-medium transition-colors"
           >
             <Phone size={15} className="mr-1.5" />
             Llamar 911
+          </a>
+          <Button
+            variant="secondary"
+            className="hidden md:inline-flex h-11 bg-white/20 text-white hover:bg-white/30 border-white/30"
+            onClick={() => setShow911Dialog(true)}
+          >
+            <Phone size={15} className="mr-1.5" />
+            Cómo llamar al 911
           </Button>
 
           {driverPhone && (
@@ -750,6 +959,83 @@ export function SosDetailClient({ sosId }: SosDetailClientProps) {
         </div>
       </div>
 
+      {/* External contacts card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="flex items-center gap-2">
+              <Send size={16} />
+              Contactos externos
+            </span>
+            {!isResolved && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowNotifyDialog(true)}
+              >
+                <Send size={14} className="mr-1.5" />
+                Notificar contactos
+              </Button>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {notifications.length === 0 ? (
+            <p className="text-[var(--text-sm)] text-[var(--neutral-500)] py-2">
+              Sin notificaciones enviadas todavía.
+              {!isResolved && ' Usá el botón de arriba para notificar a contactos de emergencia.'}
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {notifications.map((entry, idx) => (
+                <li
+                  key={`${entry.timestamp}-${idx}`}
+                  className="flex items-center gap-3 text-[var(--text-sm)] py-1.5 border-b border-[var(--neutral-100)] last:border-0"
+                >
+                  <div
+                    className="h-7 w-7 rounded-full flex items-center justify-center shrink-0"
+                    style={{
+                      background:
+                        entry.status === 'sent'
+                          ? 'var(--success-bg)'
+                          : entry.status === 'pending_provider'
+                          ? 'var(--warn-bg, #FEF3C7)'
+                          : 'var(--danger-bg)',
+                      color:
+                        entry.status === 'sent'
+                          ? 'var(--success)'
+                          : entry.status === 'pending_provider'
+                          ? '#92400E'
+                          : 'var(--danger)',
+                    }}
+                  >
+                    {channelIcon(entry.channel)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium">
+                      {channelLabel(entry.channel)}
+                      {' → '}
+                      <span className="text-[var(--neutral-700)]">{entry.recipient}</span>
+                    </p>
+                    {entry.status === 'pending_provider' && (
+                      <p className="text-[var(--text-xs)] text-[#92400E]">
+                        Pendiente: provider sin configurar (registro guardado)
+                      </p>
+                    )}
+                    {entry.status === 'failed' && (
+                      <p className="text-[var(--text-xs)] text-[var(--danger)]">Falló el envío</p>
+                    )}
+                  </div>
+                  <span className="text-[var(--text-xs)] text-[var(--neutral-400)] shrink-0">
+                    {format(new Date(entry.timestamp), 'd MMM, HH:mm', { locale: es })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Timeline + Notes */}
       <Card>
         <CardHeader>
@@ -785,6 +1071,32 @@ export function SosDetailClient({ sosId }: SosDetailClientProps) {
               </p>
             </div>
           </div>
+
+          {/* Dispatched entry */}
+          {sos.dispatched_to_dispatcher && sos.dispatched_at && (
+            <div className="flex gap-3">
+              <div className="flex flex-col items-center">
+                <div
+                  className="h-7 w-7 rounded-full flex items-center justify-center shrink-0"
+                  style={{ background: 'var(--neutral-100)', color: 'var(--neutral-700)' }}
+                >
+                  <Clock size={13} />
+                </div>
+                <div className="w-px flex-1 bg-[var(--neutral-200)] mt-1" />
+              </div>
+              <div className="pb-4 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-[var(--text-sm)]">Atendido</span>
+                  <span className="text-[var(--text-xs)] text-[var(--neutral-500)]">
+                    por {sos.dispatcher?.full_name ?? 'Despachador'}
+                  </span>
+                  <span className="ml-auto text-[var(--text-xs)] text-[var(--neutral-400)]">
+                    {format(new Date(sos.dispatched_at), 'd MMM, HH:mm:ss', { locale: es })}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Audit log entries */}
           {auditLogs && auditLogs.length > 0
@@ -853,16 +1165,42 @@ export function SosDetailClient({ sosId }: SosDetailClientProps) {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-3 py-2">
-            <p className="text-[var(--text-sm)] text-[var(--neutral-600)]">
-              Describí cómo se resolvió la emergencia. Esto quedará registrado en el historial.
-            </p>
-            <Textarea
-              placeholder="Notas de resolución (requerido)"
-              value={resolveNotes}
-              onChange={(e) => setResolveNotes(e.target.value)}
-              rows={4}
-            />
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-[var(--text-sm)] font-medium text-[var(--neutral-700)] mb-1.5 block">
+                Resultado
+              </label>
+              <select
+                value={resolveOutcome}
+                onChange={(e) => setResolveOutcome(e.target.value as ResolutionOutcome)}
+                className="w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--neutral-300)] bg-white text-[var(--text-sm)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]"
+              >
+                {RESOLUTION_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[var(--text-sm)] font-medium text-[var(--neutral-700)] mb-1.5 block">
+                Notas de resolución <span className="text-[var(--danger)]">*</span>
+              </label>
+              <Textarea
+                placeholder="Describí qué pasó (mín. 10 caracteres)..."
+                value={resolveNotes}
+                onChange={(e) => setResolveNotes(e.target.value)}
+                rows={4}
+              />
+              <p className="text-[var(--text-xs)] text-[var(--neutral-400)] mt-1">
+                {resolveNotes.length} / mín. 10 caracteres
+              </p>
+            </div>
+
+            {resolveOutcome === 'escalated_to_911' && (
+              <div className="text-[var(--text-sm)] bg-amber-50 text-amber-900 rounded-[var(--radius-md)] px-3 py-2 border border-amber-200">
+                Al confirmar se abrirá el instructivo para llamar al 911. El SOS quedará abierto hasta que lo resuelvas manualmente.
+              </div>
+            )}
           </div>
 
           <DialogFooter>
@@ -875,10 +1213,180 @@ export function SosDetailClient({ sosId }: SosDetailClientProps) {
             </Button>
             <Button
               variant="destructive"
-              disabled={!resolveNotes.trim() || resolving}
+              disabled={resolveNotes.trim().length < 10 || resolving}
               onClick={handleResolve}
             >
-              {resolving ? 'Resolviendo...' : 'Resolver SOS'}
+              {resolving
+                ? 'Guardando...'
+                : resolveOutcome === 'escalated_to_911'
+                ? 'Abrir instructivo 911'
+                : 'Resolver SOS'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 911 instructions dialog (desktop) */}
+      <Dialog open={show911Dialog} onOpenChange={setShow911Dialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Phone size={18} className="text-[var(--danger)]" />
+              Llamar al 911
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-center">
+            <div
+              className="font-bold tabular-nums tracking-wider"
+              style={{
+                fontSize: '4.5rem',
+                lineHeight: 1,
+                color: 'var(--danger)',
+              }}
+            >
+              911
+            </div>
+            <Button
+              variant="secondary"
+              onClick={handleCopy911}
+              className="w-full"
+            >
+              {copied911 ? (
+                <>
+                  <Check size={15} className="mr-1.5" />
+                  Copiado
+                </>
+              ) : (
+                <>
+                  <Copy size={15} className="mr-1.5" />
+                  Copiar número
+                </>
+              )}
+            </Button>
+            <p className="text-[var(--text-sm)] text-[var(--neutral-600)] text-left">
+              Llamá desde tu teléfono. Aún no podemos hacer la llamada por vos desde el navegador.
+            </p>
+            {address && (
+              <p className="text-[var(--text-xs)] text-left bg-[var(--neutral-50)] rounded-[var(--radius-md)] px-3 py-2 border border-[var(--neutral-200)]">
+                <strong>Ubicación a reportar:</strong>
+                <br />
+                {address}
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setShow911Dialog(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Notify contacts dialog */}
+      <Dialog open={showNotifyDialog} onOpenChange={setShowNotifyDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send size={18} />
+              Notificar contactos de emergencia
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto">
+            {!staffContacts || staffContacts.length === 0 ? (
+              <p className="text-[var(--text-sm)] text-[var(--neutral-500)]">
+                No hay contactos disponibles. Cargá admins/dispatchers en el equipo primero.
+              </p>
+            ) : (
+              <>
+                <p className="text-[var(--text-sm)] text-[var(--neutral-600)]">
+                  Marcá los canales por los que querés notificar a cada contacto.
+                </p>
+                <ul className="space-y-3">
+                  {staffContacts.map((c) => {
+                    const sel = contactSelection[c.id] ?? { email: false, sms: false, telegram: false };
+                    return (
+                      <li
+                        key={c.id}
+                        className="border border-[var(--neutral-200)] rounded-[var(--radius-md)] p-3"
+                      >
+                        <p className="font-medium text-[var(--text-sm)]">
+                          {c.full_name ?? 'Sin nombre'}
+                          <span className="text-[var(--text-xs)] text-[var(--neutral-500)] capitalize ml-2">
+                            ({c.role})
+                          </span>
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-3 text-[var(--text-sm)]">
+                          <label className={`flex items-center gap-1.5 ${c.email ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                            <input
+                              type="checkbox"
+                              disabled={!c.email}
+                              checked={sel.email}
+                              onChange={() => toggleContactChannel(c.id, 'email')}
+                            />
+                            <Mail size={13} /> Email
+                            {c.email ? (
+                              <span className="text-[var(--text-xs)] text-[var(--neutral-400)]">({c.email})</span>
+                            ) : (
+                              <span className="text-[var(--text-xs)] text-[var(--neutral-400)]">(sin email)</span>
+                            )}
+                          </label>
+                          <label className={`flex items-center gap-1.5 ${c.phone ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                            <input
+                              type="checkbox"
+                              disabled={!c.phone}
+                              checked={sel.sms}
+                              onChange={() => toggleContactChannel(c.id, 'sms')}
+                            />
+                            <Smartphone size={13} /> SMS
+                            {c.phone ? (
+                              <span className="text-[var(--text-xs)] text-[var(--neutral-400)]">({c.phone})</span>
+                            ) : (
+                              <span className="text-[var(--text-xs)] text-[var(--neutral-400)]">(sin teléfono)</span>
+                            )}
+                          </label>
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={sel.telegram}
+                              onChange={() => toggleContactChannel(c.id, 'telegram')}
+                            />
+                            <MessageCircle size={13} /> Telegram (bot)
+                          </label>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+
+                <div>
+                  <label className="text-[var(--text-sm)] font-medium text-[var(--neutral-700)] mb-1.5 block">
+                    Mensaje opcional
+                  </label>
+                  <Textarea
+                    placeholder="Mensaje adicional para los contactos..."
+                    value={notifyMessage}
+                    onChange={(e) => setNotifyMessage(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setShowNotifyDialog(false)}
+              disabled={notifying}
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={notifying || !staffContacts || staffContacts.length === 0}
+              onClick={handleNotifyContacts}
+            >
+              {notifying ? 'Enviando...' : 'Enviar notificaciones'}
             </Button>
           </DialogFooter>
         </DialogContent>

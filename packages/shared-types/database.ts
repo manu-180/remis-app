@@ -1,7 +1,3 @@
-// ARCHIVO GENERADO AUTOMATICAMENTE
-// Regenerar via: pnpm supabase:types o el MCP de Supabase
-// NO editar manualmente
-
 export type Json =
   | string
   | number
@@ -1383,6 +1379,8 @@ export type Database = {
       sos_events: {
         Row: {
           created_at: string
+          dispatched_at: string | null
+          dispatched_by: string | null
           dispatched_to_dispatcher: boolean
           driver_snapshot: Json | null
           external_contacts_notified: Json | null
@@ -1400,6 +1398,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          dispatched_at?: string | null
+          dispatched_by?: string | null
           dispatched_to_dispatcher?: boolean
           driver_snapshot?: Json | null
           external_contacts_notified?: Json | null
@@ -1417,6 +1417,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          dispatched_at?: string | null
+          dispatched_by?: string | null
           dispatched_to_dispatcher?: boolean
           driver_snapshot?: Json | null
           external_contacts_notified?: Json | null
@@ -1433,6 +1435,13 @@ export type Database = {
           vehicle_snapshot?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "sos_events_dispatched_by_fkey"
+            columns: ["dispatched_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sos_events_resolved_by_fkey"
             columns: ["resolved_by"]
@@ -2147,6 +2156,16 @@ export type Database = {
       gettransactionid: { Args: never; Returns: unknown }
       is_admin: { Args: never; Returns: boolean }
       is_dispatcher_or_admin: { Args: never; Returns: boolean }
+      list_pending_invites: {
+        Args: never
+        Returns: {
+          email: string
+          full_name: string
+          id: string
+          invited_at: string
+          role: Database["public"]["Enums"]["user_role"]
+        }[]
+      }
       list_staff: {
         Args: never
         Returns: {
