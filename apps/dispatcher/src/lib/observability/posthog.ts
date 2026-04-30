@@ -9,7 +9,9 @@ export function initPosthog() {
     person_profiles: 'identified_only',
     capture_pageview: false,
     capture_pageleave: true,
-    session_recording: { maskAllInputs: true },
+    // Audiencia del dispatcher es admin/staff: el DOM contiene PII de pasajeros/conductores.
+    // Pageviews + custom events siguen, pero no grabamos sesiones.
+    disable_session_recording: true,
   });
 }
 

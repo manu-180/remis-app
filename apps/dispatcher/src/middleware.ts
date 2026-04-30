@@ -5,6 +5,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 // can easily hit 8–12KB. We clear and redirect well before Node rejects with 431.
 const COOKIE_BLOAT_THRESHOLD = 6144; // 6KB
 
+const PROTECTED_PREFIXES = ['/admin', '/dispatch'];
+
 function hasBloatedCookies(request: NextRequest): boolean {
   const cookieHeader = request.headers.get('cookie') ?? '';
   return cookieHeader.length > COOKIE_BLOAT_THRESHOLD;
@@ -17,6 +19,10 @@ function clearSupabaseCookies(response: NextResponse): NextResponse {
     }
   });
   return response;
+}
+
+function isProtected(pathname: string): boolean {
+  return PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
 export async function middleware(request: NextRequest) {
@@ -49,12 +55,20 @@ export async function middleware(request: NextRequest) {
     },
   );
 
+  let userId: string | null = null;
   try {
-    // Refreshes session — side effect: sets updated session cookies
-    await supabase.auth.getUser();
+    const { data } = await supabase.auth.getUser();
+    userId = data.user?.id ?? null;
   } catch {
-    // Session refresh failed — clear cookies and continue unauthenticated
     clearSupabaseCookies(response);
+  }
+
+  // Belt-and-suspenders: las rutas protegidas también son chequeadas en server components
+  // via requireRole(...), pero acá cortamos antes de que se renderice nada del layout admin.
+  if (!userId && isProtected(request.nextUrl.pathname)) {
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('redirect', request.nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
   return response;

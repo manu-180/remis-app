@@ -2,8 +2,10 @@ export const dynamic = 'force-dynamic';
 
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import * as Sentry from '@sentry/nextjs';
 import { z } from 'zod';
 import { getSupabaseServerClient } from '@/lib/supabase/server';
+import { shortId } from '@/lib/short-id';
 import { SharedTripClient, type SharedTrip } from './shared-trip-client';
 
 const sharedTripSchema = z.object({
@@ -60,7 +62,14 @@ export default async function SharedTripPage({
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase.rpc as any)('get_shared_trip', { p_token: token });
-    if (error || !data) {
+    if (error) {
+      Sentry.captureException(error, {
+        tags: { endpoint: 'shared_trip' },
+        extra: { token_prefix: shortId(token) },
+      });
+      notFound();
+    }
+    if (!data) {
       notFound();
     }
     const row = Array.isArray(data) ? data[0] : data;
@@ -69,11 +78,21 @@ export default async function SharedTripPage({
     }
     const parsed = sharedTripSchema.safeParse(row);
     if (!parsed.success) {
-      console.error('[shared-trip] shape inesperado:', parsed.error.flatten());
+      Sentry.captureException(new Error('shared_trip shape mismatch'), {
+        tags: { endpoint: 'shared_trip' },
+        extra: {
+          token_prefix: shortId(token),
+          field_errors: parsed.error.flatten().fieldErrors,
+        },
+      });
       notFound();
     }
     trip = parsed.data;
-  } catch {
+  } catch (err) {
+    Sentry.captureException(err, {
+      tags: { endpoint: 'shared_trip' },
+      extra: { token_prefix: shortId(token) },
+    });
     notFound();
   }
 
