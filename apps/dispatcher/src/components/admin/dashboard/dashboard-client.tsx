@@ -9,6 +9,7 @@ import {
   DollarSign,
   XCircle,
   RefreshCw,
+  AlertCircle,
 } from 'lucide-react';
 import { PageHeader } from '@/components/admin/page-header';
 import { Card } from '@/components/ui/card';
@@ -39,7 +40,12 @@ export function DashboardClient({ profileName, initialPeriod }: DashboardClientP
   const [isRefreshing, setIsRefreshing] = useState(false);
   const router = useRouter();
 
-  const { kpis, isLoading: kpisLoading, refetch: kpisRefetch } = useDashboardKPIs(period);
+  const {
+    kpis,
+    isLoading: kpisLoading,
+    error: kpisError,
+    refetch: kpisRefetch,
+  } = useDashboardKPIs(period);
 
   const handlePeriodChange = (v: string) => {
     setPeriod(v as Period);
@@ -125,21 +131,44 @@ export function DashboardClient({ profileName, initialPeriod }: DashboardClientP
         }
       />
 
-      {/* KPI Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {kpiCards.map((card) => (
-          <Card key={card.label}>
-            <Stat
-              label={card.label}
-              value={card.value}
-              icon={card.icon}
-              loading={loading}
-              {...(card.delta !== undefined ? { delta: card.delta } : {})}
-              {...(card.prefix !== undefined ? { prefix: card.prefix } : {})}
-            />
-          </Card>
-        ))}
-      </div>
+      {/* KPI Grid o banner de error */}
+      {kpisError ? (
+        <Card className="p-4 border-l-4 border-l-[var(--danger)]">
+          <div className="flex items-center gap-3">
+            <AlertCircle size={20} className="text-[var(--danger)] shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[var(--text-sm)] font-medium text-[var(--neutral-900)]">
+                No pudimos cargar las métricas.
+              </p>
+              <p className="text-[var(--text-xs)] text-[var(--neutral-500)] mt-0.5">
+                Hubo un problema al consultar los datos. Reintentá en unos segundos.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleRefresh()}
+              className="px-3 py-1.5 text-[var(--text-sm)] font-medium rounded-[var(--radius-md)] border border-[var(--neutral-300)] text-[var(--neutral-800)] hover:bg-[var(--neutral-100)] transition-colors focus-ring"
+            >
+              Reintentar
+            </button>
+          </div>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {kpiCards.map((card) => (
+            <Card key={card.label}>
+              <Stat
+                label={card.label}
+                value={card.value}
+                icon={card.icon}
+                loading={loading}
+                {...(card.delta !== undefined ? { delta: card.delta } : {})}
+                {...(card.prefix !== undefined ? { prefix: card.prefix } : {})}
+              />
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Row 2: Sparkline + Top Drivers */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

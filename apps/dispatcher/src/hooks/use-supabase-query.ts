@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 type SupabaseBrowserClient = ReturnType<typeof getSupabaseBrowserClient>;
@@ -72,6 +73,10 @@ export function useSupabaseQuery<T>(
             : new Error(String(queryError));
         setError(err);
         setData(null);
+        Sentry.captureException(err, {
+          tags: { hook: 'useSupabaseQuery' },
+          extra: { cacheKey },
+        });
       } else {
         queryCache.set(cacheKey, result);
         setData(result);
@@ -80,8 +85,13 @@ export function useSupabaseQuery<T>(
       setIsLoading(false);
     }).catch((err: unknown) => {
       if (abortController.signal.aborted) return;
-      setError(err instanceof Error ? err : new Error(String(err)));
+      const error = err instanceof Error ? err : new Error(String(err));
+      setError(error);
       setIsLoading(false);
+      Sentry.captureException(error, {
+        tags: { hook: 'useSupabaseQuery' },
+        extra: { cacheKey },
+      });
     });
 
     return () => {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 export type Period = 'today' | 'yesterday';
@@ -103,10 +104,12 @@ async function fetchKpisForPeriod(
 export function useDashboardKPIs(period: Period): {
   kpis: DashboardKPIs | null;
   isLoading: boolean;
+  error: Error | null;
   refetch: () => Promise<void>;
 } {
   const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const fetchTokenRef = useRef(0);
   const periodRef = useRef(period);
 
@@ -117,6 +120,7 @@ export function useDashboardKPIs(period: Period): {
   const fetchAll = useCallback(async () => {
     const token = ++fetchTokenRef.current;
     setIsLoading(true);
+    setError(null);
 
     const sb = getSupabaseBrowserClient();
     const currentPeriod = periodRef.current;
@@ -156,6 +160,11 @@ export function useDashboardKPIs(period: Period): {
         revenueARSDelta: calcDelta(current.revenue, previous.revenue),
         ridesCancelledDelta: calcDelta(current.cancelled, previous.cancelled),
       });
+    } catch (err: unknown) {
+      if (token !== fetchTokenRef.current) return;
+      const e = err instanceof Error ? err : new Error(String(err));
+      setError(e);
+      Sentry.captureException(e, { tags: { hook: 'useDashboardKpis' } });
     } finally {
       if (token === fetchTokenRef.current) setIsLoading(false);
     }
@@ -165,5 +174,5 @@ export function useDashboardKPIs(period: Period): {
     void fetchAll();
   }, [period, fetchAll]);
 
-  return { kpis, isLoading, refetch: fetchAll };
+  return { kpis, isLoading, error, refetch: fetchAll };
 }
