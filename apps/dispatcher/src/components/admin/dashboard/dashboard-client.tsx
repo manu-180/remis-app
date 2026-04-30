@@ -14,7 +14,6 @@ import { PageHeader } from '@/components/admin/page-header';
 import { Card } from '@/components/ui/card';
 import { Stat } from '@/components/ui/stat';
 import { Select } from '@/components/ui/select';
-import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { useDashboardKPIs, type Period } from './use-dashboard-kpis';
 import { RidesSparkline } from './rides-sparkline';
@@ -29,9 +28,6 @@ interface DashboardClientProps {
 
 const PERIOD_OPTIONS = [
   { value: 'today', label: 'Hoy' },
-  { value: 'yesterday', label: 'Ayer' },
-  { value: 'week', label: 'Últimos 7 días' },
-  { value: 'month', label: 'Mes en curso' },
 ];
 
 export function DashboardClient({ profileName, initialPeriod }: DashboardClientProps) {
@@ -46,19 +42,17 @@ export function DashboardClient({ profileName, initialPeriod }: DashboardClientP
   const { kpis, isLoading: kpisLoading, refetch: kpisRefetch } = useDashboardKPIs(period);
 
   const handlePeriodChange = (v: string) => {
-    if (v === 'week' || v === 'month') {
-      toast.info('Pronto disponible');
-      return;
-    }
     setPeriod(v as Period);
     router.push(`/admin?period=${v}`, { scroll: false });
   };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    kpisRefetch();
-    await new Promise((r) => setTimeout(r, 800));
-    setIsRefreshing(false);
+    try {
+      await kpisRefetch();
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const loading = kpisLoading;

@@ -61,7 +61,7 @@ export function AdminShell({ profile, children }: AdminShellProps) {
 
       {/* Sidebar desktop — fixed left */}
       <aside className="hidden lg:flex fixed left-0 top-0 h-screen z-20">
-        <Sidebar collapsed={collapsed} onToggle={handleToggle} />
+        <Sidebar collapsed={collapsed} onToggle={handleToggle} role={profile.role} />
       </aside>
 
       {/* Sidebar mobile — Drawer desde la izquierda */}
@@ -75,6 +75,7 @@ export function AdminShell({ profile, children }: AdminShellProps) {
           collapsed={false}
           onToggle={() => setMobileOpen(false)}
           mobile
+          role={profile.role}
           onClose={() => setMobileOpen(false)}
         />
       </Drawer>

@@ -1,11 +1,9 @@
 'use client';
 
-import { AlertTriangle, ShieldCheck, ShieldX, Clock, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, ShieldX, Clock, Smartphone } from 'lucide-react';
 import { useSupabaseQuery } from '@/hooks/use-supabase-query';
-import { toast } from '@/components/ui/use-toast';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatDateShort } from '@/lib/format';
@@ -100,26 +98,6 @@ export function DriverTabKyc({ driverId }: DriverTabKycProps) {
         </div>
       )}
 
-      {/* Initiate verification */}
-      <Card>
-        <CardContent className="pt-4 pb-4 flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-[var(--neutral-900)]">Verificación de identidad</p>
-            <p className="text-xs text-[var(--neutral-500)] mt-0.5">
-              Inicia una nueva sesión de verificación KYC para este conductor.
-            </p>
-          </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => toast.info('Funcionalidad en desarrollo')}
-          >
-            <RefreshCw size={14} className="mr-1.5" />
-            Iniciar verificación
-          </Button>
-        </CardContent>
-      </Card>
-
       {/* History */}
       <Card>
         <CardHeader>
@@ -132,9 +110,9 @@ export function DriverTabKyc({ driverId }: DriverTabKycProps) {
             </div>
           ) : !verifications?.length ? (
             <EmptyState
-              icon={<ShieldX size={28} />}
-              title="Sin verificaciones"
-              description="No hay verificaciones KYC registradas para este conductor."
+              icon={<Smartphone size={28} />}
+              title="Este conductor aún no completó su verificación KYC desde la app."
+              description="El proceso lo inicia el conductor desde su dispositivo."
             />
           ) : (
             <ul className="divide-y divide-[var(--neutral-100)]">

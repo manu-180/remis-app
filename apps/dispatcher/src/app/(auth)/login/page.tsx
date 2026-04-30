@@ -4,6 +4,16 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { toast } from '@/components/ui/use-toast';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
@@ -12,6 +22,29 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error,    setError]    = useState('');
   const [loading,  setLoading]  = useState(false);
+
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (resetError) throw resetError;
+      toast.success('Te enviamos un email con instrucciones para recuperar tu contraseña.');
+      setResetOpen(false);
+      setResetEmail('');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo enviar el email de recuperación.');
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,15 +136,61 @@ export default function LoginPage() {
         </form>
 
         <p className="text-center mt-4">
-          <a href="#" className="text-[var(--text-sm)] text-[var(--neutral-500)] hover:text-[var(--brand-primary)] transition-colors">
+          <button
+            type="button"
+            onClick={() => {
+              setResetEmail(email);
+              setResetOpen(true);
+            }}
+            className="text-[var(--text-sm)] text-[var(--neutral-500)] hover:text-[var(--brand-primary)] transition-colors"
+          >
             ¿Olvidaste tu contraseña?
-          </a>
+          </button>
         </p>
       </div>
 
       <p className="text-center text-[var(--text-xs)] text-[var(--neutral-500)] mt-4">
         v0.1.0
       </p>
+
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Recuperar contraseña</DialogTitle>
+            <DialogDescription>
+              Ingresá tu email y te enviaremos un enlace para crear una nueva contraseña.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleResetPassword} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="reset_email">Email</Label>
+              <Input
+                id="reset_email"
+                type="email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                placeholder="tu@email.com"
+                autoComplete="email"
+                required
+                autoFocus
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setResetOpen(false)}
+                disabled={resetLoading}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" variant="primary" disabled={resetLoading || !resetEmail}>
+                {resetLoading ? 'Enviando…' : 'Enviar email'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

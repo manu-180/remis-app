@@ -15,20 +15,25 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import type { Database } from '@remis/shared-types/database';
 
 /* ── Types ─────────────────────────────────────────────────── */
+type Role = Database['public']['Enums']['user_role'];
+
 interface NavItemDef {
   href: string;
   label: string;
   icon: React.ElementType;
   badge?: 'sos';
   exact?: boolean;
+  hideForRoles?: Role[];
 }
 
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
   mobile?: boolean;
+  role?: Role;
 }
 
 /* ── Nav sections ──────────────────────────────────────────── */
@@ -37,7 +42,7 @@ const SECTIONS: { title: string; items: NavItemDef[] }[] = [
     title: 'Operación',
     items: [
       { href: '/admin',     label: 'Dashboard',     icon: LayoutDashboard, exact: true },
-      { href: '/',          label: 'Despacho live',  icon: Radio,           exact: true },
+      { href: '/',          label: 'Despacho live',  icon: Radio,           exact: true, hideForRoles: ['admin'] },
       { href: '/admin/sos', label: 'SOS',            icon: AlertTriangle,   badge: 'sos' },
     ],
   },
@@ -166,9 +171,17 @@ function SidebarContent({
   collapsed,
   onToggle,
   mobile,
+  role,
   onClose,
 }: SidebarProps & { onClose?: () => void }) {
   const sosCount = useSosCount();
+
+  const visibleSections = SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter(
+      (item) => !item.hideForRoles || !role || !item.hideForRoles.includes(role),
+    ),
+  })).filter((section) => section.items.length > 0);
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -223,7 +236,7 @@ function SidebarContent({
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-5">
-          {SECTIONS.map((section) => (
+          {visibleSections.map((section) => (
             <div key={section.title}>
               {/* Section title */}
               {!collapsed && !mobile ? (

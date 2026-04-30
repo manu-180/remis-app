@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { MapPin, Navigation } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useSupabaseQuery } from '@/hooks/use-supabase-query';
-import { toast } from '@/components/ui/use-toast';
 import {
   DataTable,
   createStatusColumn,
@@ -51,6 +51,7 @@ interface DriverTabViajesProps {
 
 export function DriverTabViajes({ driverId }: DriverTabViajesProps) {
   const [page, setPage] = useState(1);
+  const router = useRouter();
 
   const { data: ridesData, isLoading, error } = useSupabaseQuery<{
     data: RideRow[];
@@ -129,7 +130,7 @@ export function DriverTabViajes({ driverId }: DriverTabViajesProps) {
       data={rides}
       loading={isLoading}
       error={error}
-      onRowClick={() => toast.info('Detalle de viaje — próximamente')}
+      onRowClick={(row: RideRow) => router.push(`/admin/rides/${row.id}`)}
       {...(paginationProp ? { pagination: paginationProp } : {})}
     />
   );

@@ -3,7 +3,7 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 
 import { useState, useEffect } from 'react';
-import { Loader2, UserPlus } from 'lucide-react';
+import { Loader2, UserPlus, Copy, Check } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
 import { Drawer } from '@/components/ui/drawer';
+import { toast } from '@/components/ui/use-toast';
 import { useConfirm } from '@/components/admin/confirm-dialog';
 
 // ---------------------------------------------------------------------------
@@ -186,6 +187,33 @@ export function TeamClient() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('dispatcher');
+  const [inviteEmailError, setInviteEmailError] = useState<string | null>(null);
+  const [sqlCopied, setSqlCopied] = useState(false);
+
+  function buildSqlSnippet(email: string, role: string) {
+    const safeEmail = email.trim() || 'nuevo@email.com';
+    return `UPDATE profiles SET role = '${role}' WHERE email = '${safeEmail}';`;
+  }
+
+  async function handleCopySql() {
+    if (!inviteEmail) {
+      setInviteEmailError('Ingresá un email primero.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail)) {
+      setInviteEmailError('Email inválido.');
+      return;
+    }
+    setInviteEmailError(null);
+    try {
+      await navigator.clipboard.writeText(buildSqlSnippet(inviteEmail, inviteRole));
+      setSqlCopied(true);
+      toast.success('SQL copiado al portapapeles.');
+      setTimeout(() => setSqlCopied(false), 2000);
+    } catch {
+      toast.error('No se pudo copiar el SQL.');
+    }
+  }
 
   // Load
   useEffect(() => {
@@ -325,21 +353,49 @@ export function TeamClient() {
       {/* Invite drawer */}
       <Drawer
         open={inviteOpen}
-        onOpenChange={setInviteOpen}
+        onOpenChange={(open) => {
+          setInviteOpen(open);
+          if (!open) {
+            setInviteEmailError(null);
+            setSqlCopied(false);
+          }
+        }}
         title="Invitar nuevo miembro"
         width="sm"
       >
         <div className="space-y-4">
+          <p className="text-sm text-[var(--neutral-600)]">
+            Las invitaciones por email se incorporan en la próxima versión. Mientras tanto, podés sumar
+            un miembro en dos pasos:
+          </p>
+
+          <ol className="space-y-2 text-sm text-[var(--neutral-700)] list-decimal pl-5">
+            <li>
+              Creá el usuario en Supabase Dashboard → <strong>Authentication → Users → Invite user</strong>.
+            </li>
+            <li>
+              Asignale el rol corriendo el SQL de abajo en{' '}
+              <strong>SQL Editor</strong>.
+            </li>
+          </ol>
+
           <div>
-            <Label>Email</Label>
+            <Label>Email del nuevo miembro</Label>
             <Input
               type="email"
               value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
+              onChange={(e) => {
+                setInviteEmail(e.target.value);
+                if (inviteEmailError) setInviteEmailError(null);
+              }}
               placeholder="usuario@example.com"
               className="mt-1"
             />
+            {inviteEmailError && (
+              <p className="text-xs text-[var(--danger)] mt-1">{inviteEmailError}</p>
+            )}
           </div>
+
           <div>
             <Label>Rol</Label>
             <div className="mt-1">
@@ -353,23 +409,40 @@ export function TeamClient() {
               />
             </div>
           </div>
-          <div className="p-3 rounded-[var(--radius-md)] bg-[var(--neutral-50)] text-sm text-[var(--neutral-600)]">
-            <strong>TODO:</strong> La invitación por email requiere implementar la edge function{' '}
-            <code>admin-invite-staff</code>. Por ahora, crear el usuario manualmente en Supabase Auth
-            y ejecutar:
-            <br />
-            <code className="text-xs">
-              UPDATE profiles SET role = &apos;{inviteRole}&apos; WHERE email = &apos;{inviteEmail || 'email'}&apos;;
+
+          <div className="rounded-[var(--radius-md)] bg-[var(--neutral-50)] border border-[var(--neutral-200)] p-3">
+            <p className="text-xs uppercase tracking-wide text-[var(--neutral-500)] font-semibold mb-1.5">
+              SQL para asignar el rol
+            </p>
+            <code className="block text-xs font-mono text-[var(--neutral-800)] break-all">
+              {buildSqlSnippet(inviteEmail, inviteRole)}
             </code>
           </div>
         </div>
-        <div className="pt-4">
+
+        <div className="pt-4 flex flex-col gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full"
+            onClick={handleCopySql}
+          >
+            {sqlCopied ? (
+              <>
+                <Check size={14} className="mr-1.5" /> SQL copiado
+              </>
+            ) : (
+              <>
+                <Copy size={14} className="mr-1.5" /> Copiar SQL
+              </>
+            )}
+          </Button>
           <Button
             type="button"
             className="w-full"
             onClick={() => setInviteOpen(false)}
           >
-            Cerrar (TODO: implementar invite)
+            Cerrar
           </Button>
         </div>
       </Drawer>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 export type Period = 'today' | 'yesterday';
@@ -103,21 +103,25 @@ async function fetchKpisForPeriod(
 export function useDashboardKPIs(period: Period): {
   kpis: DashboardKPIs | null;
   isLoading: boolean;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 } {
   const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [version, setVersion] = useState(0);
-
-  const refetch = useCallback(() => setVersion((v) => v + 1), []);
+  const fetchTokenRef = useRef(0);
+  const periodRef = useRef(period);
 
   useEffect(() => {
-    let cancelled = false;
+    periodRef.current = period;
+  }, [period]);
+
+  const fetchAll = useCallback(async () => {
+    const token = ++fetchTokenRef.current;
     setIsLoading(true);
 
     const sb = getSupabaseBrowserClient();
-    const { start, end } = getPeriodBounds(period);
-    const { start: prevStart, end: prevEnd } = getPreviousPeriodBounds(period);
+    const currentPeriod = periodRef.current;
+    const { start, end } = getPeriodBounds(currentPeriod);
+    const { start: prevStart, end: prevEnd } = getPreviousPeriodBounds(currentPeriod);
 
     const ACTIVE_STATUSES = [
       'assigned',
@@ -126,19 +130,21 @@ export function useDashboardKPIs(period: Period): {
       'on_trip',
     ] as const;
 
-    Promise.all([
-      fetchKpisForPeriod(sb, start, end),
-      fetchKpisForPeriod(sb, prevStart, prevEnd),
-      sb
-        .from('rides')
-        .select('id', { count: 'exact', head: true })
-        .in('status', ACTIVE_STATUSES as unknown as string[]),
-      sb
-        .from('drivers')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_online', true),
-    ]).then(([current, previous, activeRes, onlineRes]) => {
-      if (cancelled) return;
+    try {
+      const [current, previous, activeRes, onlineRes] = await Promise.all([
+        fetchKpisForPeriod(sb, start, end),
+        fetchKpisForPeriod(sb, prevStart, prevEnd),
+        sb
+          .from('rides')
+          .select('id', { count: 'exact', head: true })
+          .in('status', ACTIVE_STATUSES as unknown as string[]),
+        sb
+          .from('drivers')
+          .select('id', { count: 'exact', head: true })
+          .eq('is_online', true),
+      ]);
+
+      if (token !== fetchTokenRef.current) return;
 
       setKpis({
         ridesTotal: current.total,
@@ -150,13 +156,14 @@ export function useDashboardKPIs(period: Period): {
         revenueARSDelta: calcDelta(current.revenue, previous.revenue),
         ridesCancelledDelta: calcDelta(current.cancelled, previous.cancelled),
       });
-      setIsLoading(false);
-    }).catch(() => {
-      if (!cancelled) setIsLoading(false);
-    });
+    } finally {
+      if (token === fetchTokenRef.current) setIsLoading(false);
+    }
+  }, []);
 
-    return () => { cancelled = true; };
-  }, [period, version]);
+  useEffect(() => {
+    void fetchAll();
+  }, [period, fetchAll]);
 
-  return { kpis, isLoading, refetch };
+  return { kpis, isLoading, refetch: fetchAll };
 }

@@ -98,6 +98,7 @@ lerna-debug.log*
 *.tsbuildinfo
 .cache/
 .eslintcache
+apps/dispatcher/qr.png
 
 # ───────── Session state local (no commitear) ─────────
 .remember/

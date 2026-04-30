@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, XCircle, Download, Car, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { Eye, XCircle, Car, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useSupabaseQuery } from '@/hooks/use-supabase-query';
 import { useRealtimeTable } from '@/hooks/use-realtime-table';
@@ -16,10 +16,8 @@ import {
 import { PageHeader } from '@/components/admin/page-header';
 import { Card } from '@/components/ui/card';
 import { Stat } from '@/components/ui/stat';
-import { Button } from '@/components/ui/button';
 import { StatusPill } from '@/components/ui/status-pill';
 import type { PillVariant } from '@/components/ui/status-pill';
-import { toast } from '@/components/ui/use-toast';
 import { formatARS } from '@/lib/format';
 
 // ---------------------------------------------------------------------------
@@ -347,16 +345,6 @@ export function RidesListClient() {
       <PageHeader
         title="Viajes"
         description="Historial completo de viajes, estados y métricas."
-        actions={
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => toast.info('Exportación iniciada — el archivo se descargará en breve.')}
-          >
-            <Download size={15} className="mr-1.5" />
-            Exportar CSV
-          </Button>
-        }
       />
 
       {/* KPI Strip */}

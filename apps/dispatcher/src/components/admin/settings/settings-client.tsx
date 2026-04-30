@@ -2,7 +2,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Eye, EyeOff, Copy, Check } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,6 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { toast } from '@/components/ui/use-toast';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -225,93 +226,52 @@ function NotificationsTab({ settings }: { settings: OrgSettings | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// IntegrationKeyCard — single masked key display
-// ---------------------------------------------------------------------------
-function IntegrationKeyCard({
-  label,
-  maskedValue,
-}: {
-  label: string;
-  maskedValue: string;
-}) {
-  const [show, setShow] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  function handleCopy() {
-    navigator.clipboard.writeText(maskedValue).catch(() => null);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }
-
-  return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <div className="flex items-center gap-2">
-        <Input
-          type={show ? 'text' : 'password'}
-          value={maskedValue}
-          readOnly
-          className="font-mono"
-        />
-        <button
-          type="button"
-          onClick={() => setShow((s) => !s)}
-          className="shrink-0 p-2 rounded-[var(--radius-md)] border border-[var(--neutral-200)] hover:bg-[var(--neutral-100)] transition-colors"
-          aria-label={show ? 'Ocultar' : 'Mostrar'}
-        >
-          {show ? <EyeOff size={16} /> : <Eye size={16} />}
-        </button>
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="shrink-0 p-2 rounded-[var(--radius-md)] border border-[var(--neutral-200)] hover:bg-[var(--neutral-100)] transition-colors"
-          aria-label="Copiar"
-        >
-          {copied ? <Check size={16} className="text-[var(--success)]" /> : <Copy size={16} />}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Tab: Integraciones
-// ---------------------------------------------------------------------------
-function IntegrationsTab() {
-  return (
-    <div className="space-y-6">
-      <IntegrationKeyCard
-        label="Supabase URL"
-        maskedValue="https://*****.supabase.co"
-      />
-      <IntegrationKeyCard
-        label="MercadoPago Access Token"
-        maskedValue="••••••••••••••••••••••••"
-      />
-      <IntegrationKeyCard
-        label="API Key interna"
-        maskedValue="••••••••••••••••••••••••"
-      />
-      <p className="text-sm text-[var(--neutral-500)] mt-4 p-3 bg-[var(--neutral-50)] rounded">
-        Las claves de integración se configuran via variables de entorno (.env). Este panel es solo de referencia.
-      </p>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Tab: Cuenta
 // ---------------------------------------------------------------------------
 function AccountTab() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [twoFaEnabled, setTwoFaEnabled] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleChangePassword() {
-    // TODO: Implement password change via Supabase Auth
-    // supabase.auth.updateUser({ password: newPassword })
-    alert('Funcionalidad en desarrollo');
+  async function handleChangePassword() {
+    if (newPassword.length < 8) {
+      toast.error('La nueva contraseña debe tener al menos 8 caracteres.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('La nueva contraseña y la confirmación no coinciden.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !userData.user?.email) {
+        throw new Error('No se pudo identificar tu sesión actual. Volvé a iniciar sesión.');
+      }
+
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: userData.user.email,
+        password: currentPassword,
+      });
+      if (signInErr) {
+        throw new Error('La contraseña actual es incorrecta.');
+      }
+
+      const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateErr) throw updateErr;
+
+      toast.success('Contraseña actualizada correctamente.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo actualizar la contraseña.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -326,6 +286,7 @@ function AccountTab() {
               id="current_password"
               type="password"
               placeholder="Contraseña actual"
+              autoComplete="current-password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
             />
@@ -335,7 +296,9 @@ function AccountTab() {
             <Input
               id="new_password"
               type="password"
-              placeholder="Nueva contraseña"
+              placeholder="Mínimo 8 caracteres"
+              autoComplete="new-password"
+              minLength={8}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
             />
@@ -345,34 +308,41 @@ function AccountTab() {
             <Input
               id="confirm_password"
               type="password"
-              placeholder="Confirmar nueva contraseña"
+              placeholder="Repetí la nueva contraseña"
+              autoComplete="new-password"
+              minLength={8}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
             />
           </div>
           <Button
             onClick={handleChangePassword}
-            disabled={!currentPassword || !newPassword || !confirmPassword}
+            disabled={submitting || !currentPassword || !newPassword || !confirmPassword}
           >
-            Cambiar contraseña
+            {submitting ? 'Guardando…' : 'Cambiar contraseña'}
           </Button>
         </div>
       </div>
 
       {/* 2FA section */}
       <div className="space-y-3 pt-4 border-t border-[var(--neutral-100)]">
-        <h3 className="font-semibold text-[var(--neutral-900)]">Autenticación en dos pasos</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-[var(--neutral-900)]">Autenticación en dos pasos</h3>
+          <Badge className="bg-[var(--neutral-100)] text-[var(--neutral-600)]">Próximamente</Badge>
+        </div>
         <div className="flex items-center gap-3">
           <Switch
             id="twofa"
-            checked={twoFaEnabled}
-            onCheckedChange={setTwoFaEnabled}
+            checked={false}
+            disabled
             aria-label="Autenticación en dos pasos"
           />
-          <Label htmlFor="twofa">Autenticación en dos pasos</Label>
+          <Label htmlFor="twofa" className="text-[var(--neutral-500)]">
+            Activar autenticación en dos pasos
+          </Label>
         </div>
         <p className="text-sm text-[var(--neutral-500)]">
-          La configuración de 2FA estará disponible próximamente.
+          Sumamos 2FA en la próxima versión para reforzar el acceso a la operación.
         </p>
       </div>
     </div>
@@ -404,7 +374,6 @@ export function SettingsClient() {
       <TabsList className="bg-[var(--neutral-100)] text-[var(--neutral-600)]">
         <TabsTrigger value="organization">Organización</TabsTrigger>
         <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
-        <TabsTrigger value="integrations">Integraciones</TabsTrigger>
         <TabsTrigger value="account">Cuenta</TabsTrigger>
       </TabsList>
 
@@ -422,15 +391,6 @@ export function SettingsClient() {
         <Card>
           <CardContent className="pt-6">
             {loading ? <SkeletonFields count={2} /> : <NotificationsTab settings={settings} />}
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      {/* Integraciones */}
-      <TabsContent value="integrations">
-        <Card>
-          <CardContent className="pt-6">
-            <IntegrationsTab />
           </CardContent>
         </Card>
       </TabsContent>
