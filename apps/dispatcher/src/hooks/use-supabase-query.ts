@@ -6,6 +6,25 @@ import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 type SupabaseBrowserClient = ReturnType<typeof getSupabaseBrowserClient>;
 
+function toError(value: unknown): Error {
+  if (value instanceof Error) return value;
+  if (value && typeof value === 'object') {
+    const v = value as { message?: unknown; details?: unknown; hint?: unknown; code?: unknown };
+    const parts: string[] = [];
+    if (typeof v.message === 'string' && v.message) parts.push(v.message);
+    if (typeof v.details === 'string' && v.details) parts.push(v.details);
+    if (typeof v.hint === 'string' && v.hint) parts.push(`(hint: ${v.hint})`);
+    if (typeof v.code === 'string' && v.code) parts.push(`[${v.code}]`);
+    if (parts.length > 0) {
+      const err = new Error(parts.join(' '));
+      Object.assign(err, value);
+      return err;
+    }
+    try { return new Error(JSON.stringify(value)); } catch { /* fallthrough */ }
+  }
+  return new Error(String(value));
+}
+
 type QueryResult<T> = {
   data: T | null;
   error: Error | null;
@@ -67,10 +86,7 @@ export function useSupabaseQuery<T>(
       if (abortController.signal.aborted) return;
 
       if (queryError) {
-        const err =
-          queryError instanceof Error
-            ? queryError
-            : new Error(String(queryError));
+        const err = toError(queryError);
         setError(err);
         setData(null);
         Sentry.captureException(err, {
@@ -85,7 +101,7 @@ export function useSupabaseQuery<T>(
       setIsLoading(false);
     }).catch((err: unknown) => {
       if (abortController.signal.aborted) return;
-      const error = err instanceof Error ? err : new Error(String(err));
+      const error = toError(err);
       setError(error);
       setIsLoading(false);
       Sentry.captureException(error, {

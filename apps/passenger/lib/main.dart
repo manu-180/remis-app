@@ -11,25 +11,6 @@ import 'core/notifications/notification_router.dart';
 import 'core/routing/app_router.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  await Supabase.initialize(
-    url: Env.supabaseUrl,
-    anonKey: Env.supabaseAnonKey,
-  );
-
-  if (Env.posthogKey.isNotEmpty) {
-    final config = PostHogConfig(Env.posthogKey)
-      ..host = 'https://us.i.posthog.com'
-      ..captureApplicationLifecycleEvents = true
-      ..sessionReplay = true
-      ..sessionReplayConfig = (PostHogSessionReplayConfig()
-        ..maskAllTexts = true
-        ..maskAllImages = false)
-      ..debug = !Env.isProd;
-    await Posthog().setup(config);
-  }
-
   await SentryFlutter.init(
     (options) {
       options.dsn = Env.sentryDsn;
@@ -47,12 +28,33 @@ Future<void> main() async {
         return event;
       };
     },
-    appRunner: () => runApp(
-      ProviderScope(
-        observers: [_FcmInitObserver()],
-        child: const PassengerApp(),
-      ),
-    ),
+    appRunner: () async {
+      WidgetsFlutterBinding.ensureInitialized();
+
+      await Supabase.initialize(
+        url: Env.supabaseUrl,
+        anonKey: Env.supabaseAnonKey,
+      );
+
+      if (Env.posthogKey.isNotEmpty) {
+        final config = PostHogConfig(Env.posthogKey)
+          ..host = 'https://us.i.posthog.com'
+          ..captureApplicationLifecycleEvents = true
+          ..sessionReplay = true
+          ..sessionReplayConfig = (PostHogSessionReplayConfig()
+            ..maskAllTexts = true
+            ..maskAllImages = false)
+          ..debug = !Env.isProd;
+        await Posthog().setup(config);
+      }
+
+      runApp(
+        ProviderScope(
+          observers: [_FcmInitObserver()],
+          child: const PassengerApp(),
+        ),
+      );
+    },
   );
 }
 

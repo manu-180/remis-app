@@ -105,7 +105,7 @@ type RideDetail = {
   dest_location: unknown;
   requested_via: string | null;
   vehicle_type_requested: string | null;
-  passenger_count: number | null;
+  passengers_count: number | null;
   passengers: {
     id: string;
     profiles: Profile | null;

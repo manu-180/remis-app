@@ -65,7 +65,7 @@ type RideRow = {
   payment_method: string | null;
   payment_status: string | null;
   vehicle_type_requested: string | null;
-  passenger_count: number | null;
+  passengers_count: number | null;
   requested_via: string | null;
   passengers: {
     profiles: PassengerProfile | null;
@@ -189,7 +189,7 @@ export function RidesListClient() {
           `
             id, status, requested_at, assigned_at, pickup_address, dest_address,
             final_fare_ars, estimated_fare_ars, payment_method, payment_status,
-            vehicle_type_requested, passenger_count, requested_via,
+            vehicle_type_requested, passengers_count, requested_via,
             passengers!rides_passenger_id_fkey(
               profiles!inner(full_name, phone)
             ),
@@ -269,7 +269,7 @@ export function RidesListClient() {
     { header: 'Método de pago', accessor: (r) => r.payment_method ?? '' },
     { header: 'Estado de pago', accessor: (r) => r.payment_status ?? '' },
     { header: 'Vehículo solicitado', accessor: (r) => r.vehicle_type_requested ?? '' },
-    { header: 'Pasajeros', accessor: (r) => r.passenger_count ?? '' },
+    { header: 'Pasajeros', accessor: (r) => r.passengers_count ?? '' },
     { header: 'Canal', accessor: (r) => r.requested_via ?? '' },
     { header: 'Pedido (UTC)', accessor: (r) => r.requested_at ?? '' },
     { header: 'Asignado (UTC)', accessor: (r) => r.assigned_at ?? '' },
@@ -290,7 +290,7 @@ export function RidesListClient() {
           `
             id, status, requested_at, assigned_at, pickup_address, dest_address,
             final_fare_ars, estimated_fare_ars, payment_method, payment_status,
-            vehicle_type_requested, passenger_count, requested_via,
+            vehicle_type_requested, passengers_count, requested_via,
             passengers!rides_passenger_id_fkey(
               profiles!inner(full_name, phone)
             ),

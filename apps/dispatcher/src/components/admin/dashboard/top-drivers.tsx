@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Crown, Star } from 'lucide-react';
 import { useSupabaseQuery } from '@/hooks/use-supabase-query';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
