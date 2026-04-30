@@ -8,9 +8,12 @@ import { es } from 'date-fns/locale';
 import { Users, Ban, AlertTriangle, TrendingDown, Eye, Trash2, MoreVertical } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import { useExportCsv } from '@/hooks/use-export-csv';
+import type { CsvColumn } from '@/lib/export-csv';
 import {
   DataTable,
   FilterBar,
+  ExportCsvButton,
   createAvatarColumn,
   createDateColumn,
   createTabularColumn,
@@ -547,6 +550,69 @@ export function PassengersClient() {
     fetchPassengers();
   };
 
+  // ---------------------------------------------------------------------------
+  // CSV export — respects current filters (búsqueda + only-blacklisted toggle)
+  // ---------------------------------------------------------------------------
+  const passengerCsvColumns: CsvColumn<PassengerRow>[] = [
+    { header: 'ID', accessor: (r) => r.id },
+    { header: 'Nombre', accessor: (r) => r.profiles?.full_name ?? '' },
+    { header: 'Email', accessor: (r) => r.profiles?.email ?? '' },
+    { header: 'Teléfono', accessor: (r) => r.profiles?.phone ?? '' },
+    {
+      header: 'Método de pago',
+      accessor: (r) => r.default_payment_method ?? '',
+    },
+    { header: 'Total viajes', accessor: (r) => r.total_rides ?? 0 },
+    { header: 'Total no-shows', accessor: (r) => r.total_no_shows ?? 0 },
+    { header: 'Bloqueado', accessor: (r) => (r.blacklisted ? 'sí' : 'no') },
+    {
+      header: 'Razón bloqueo',
+      accessor: (r) => r.blacklist_reason ?? '',
+    },
+    { header: 'Notas', accessor: (r) => r.notes ?? '' },
+    {
+      header: 'Creado (UTC)',
+      accessor: (r) => r.profiles?.created_at ?? '',
+    },
+  ];
+
+  // Passengers list filters by `query` client-side. We replicate that
+  // filter on the page-by-page fetch to keep CSV in sync with the visible list.
+  const passengerExportFetchPage = useCallback(
+    async (offset: number, limit: number): Promise<PassengerRow[]> => {
+      let q2 = (supabase as any)
+        .from('passengers')
+        .select(
+          '*, profiles(id, full_name, phone, email, avatar_url, created_at)',
+        )
+        .order('total_rides', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (showBlacklisted) {
+        q2 = q2.eq('blacklisted', true);
+      }
+
+      const { data, error: err } = await q2;
+      if (err) throw new Error(err.message);
+      const rows = (data ?? []) as PassengerRow[];
+      if (!query.trim()) return rows;
+      const needle = query.toLowerCase();
+      return rows.filter((p) => {
+        const name = (p.profiles?.full_name ?? '').toLowerCase();
+        const phone = (p.profiles?.phone ?? '').toLowerCase();
+        return name.includes(needle) || phone.includes(needle);
+      });
+    },
+    [supabase, query, showBlacklisted],
+  );
+
+  const { exportNow: exportPassengers, exporting: exportingPassengers } =
+    useExportCsv<PassengerRow>({
+      filename: 'passengers',
+      columns: passengerCsvColumns,
+      fetchPage: passengerExportFetchPage,
+    });
+
   const handleDelete = async (row: PassengerRow) => {
     const ok = await confirm({
       title: '¿Eliminar pasajero?',
@@ -756,6 +822,12 @@ export function PassengersClient() {
           <Ban size={14} className="mr-1.5" />
           {showBlacklisted ? 'Todos' : 'Solo bloqueados'}
         </Button>
+        <ExportCsvButton
+          size="sm"
+          onClick={exportPassengers}
+          exporting={exportingPassengers}
+          emptyHint={filtered.length === 0 && !loading}
+        />
       </div>
 
       {/* Table */}

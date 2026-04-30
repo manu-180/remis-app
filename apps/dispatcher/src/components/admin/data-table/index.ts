@@ -11,3 +11,5 @@ export {
 } from './column-helpers';
 export { FilterBar } from './filter-bar';
 export type { FilterBarProps, FilterConfig } from './filter-bar';
+export { ExportCsvButton } from './export-csv-button';
+export type { ExportCsvButtonProps } from './export-csv-button';

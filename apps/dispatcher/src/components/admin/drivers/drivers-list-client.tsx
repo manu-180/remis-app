@@ -6,10 +6,13 @@ import { Plus, Eye, Pencil, Ban, Users, Wifi, Car, AlertOctagon } from 'lucide-r
 import type { ColumnDef } from '@tanstack/react-table';
 import { useSupabaseQuery } from '@/hooks/use-supabase-query';
 import { useRealtimeTable } from '@/hooks/use-realtime-table';
+import { useExportCsv } from '@/hooks/use-export-csv';
+import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { escapeOrFilter } from '@/lib/postgrest-safe';
 import {
   DataTable,
   FilterBar,
+  ExportCsvButton,
   createAvatarColumn,
   createStatusColumn,
   createTabularColumn,
@@ -21,6 +24,7 @@ import { Card } from '@/components/ui/card';
 import { Stat } from '@/components/ui/stat';
 import { Button } from '@/components/ui/button';
 import type { PillVariant } from '@/components/ui/status-pill';
+import type { CsvColumn } from '@/lib/export-csv';
 import { DriverFormDrawer } from './driver-form-drawer';
 import type { DriverWithProfile } from './driver-profile-client';
 
@@ -167,6 +171,99 @@ export function DriversListClient() {
   const totalCount = driversData?.count ?? 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
+  // ---------------------------------------------------------------------------
+  // CSV export — respects current filters (búsqueda + estado)
+  // ---------------------------------------------------------------------------
+  type DriverExportRow = {
+    id: string;
+    is_active: boolean;
+    is_online: boolean;
+    current_status: string;
+    rating: number | null;
+    total_rides: number | null;
+    joined_at: string | null;
+    profiles: {
+      full_name: string | null;
+      email: string | null;
+      phone: string | null;
+      role: string | null;
+    } | null;
+    vehicles: {
+      plate: string | null;
+      make: string | null;
+      model: string | null;
+    } | null;
+    kyc_verifications:
+      | { status: string | null; updated_at: string | null }[]
+      | null;
+  };
+
+  const driverCsvColumns: CsvColumn<DriverExportRow>[] = [
+    { header: 'ID', accessor: (r) => r.id },
+    { header: 'Nombre', accessor: (r) => r.profiles?.full_name ?? '' },
+    { header: 'Email', accessor: (r) => r.profiles?.email ?? '' },
+    { header: 'Teléfono', accessor: (r) => r.profiles?.phone ?? '' },
+    { header: 'Rol', accessor: (r) => r.profiles?.role ?? '' },
+    { header: 'Estado actual', accessor: (r) => r.current_status },
+    { header: 'Activo', accessor: (r) => (r.is_active ? 'sí' : 'no') },
+    { header: 'Online', accessor: (r) => (r.is_online ? 'sí' : 'no') },
+    { header: 'Patente', accessor: (r) => r.vehicles?.plate ?? '' },
+    { header: 'Marca', accessor: (r) => r.vehicles?.make ?? '' },
+    { header: 'Modelo', accessor: (r) => r.vehicles?.model ?? '' },
+    { header: 'Rating', accessor: (r) => r.rating ?? '' },
+    { header: 'Total viajes', accessor: (r) => r.total_rides ?? '' },
+    { header: 'Joined at (UTC)', accessor: (r) => r.joined_at ?? '' },
+    {
+      header: 'KYC status',
+      accessor: (r) => {
+        const list = r.kyc_verifications ?? [];
+        if (list.length === 0) return '';
+        const sorted = [...list].sort((a, b) => {
+          const ta = a.updated_at ?? '';
+          const tb = b.updated_at ?? '';
+          return tb.localeCompare(ta);
+        });
+        return sorted[0]?.status ?? '';
+      },
+    },
+  ];
+
+  const { exportNow, exporting } = useExportCsv<DriverExportRow>({
+    filename: 'drivers',
+    columns: driverCsvColumns,
+    fetchPage: async (offset, limit) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = getSupabaseBrowserClient() as any;
+      let query = sb
+        .from('drivers')
+        .select(
+          `
+            id, is_active, is_online, current_status, rating, total_rides, joined_at,
+            profiles!inner(full_name, email, phone, role, deleted_at),
+            vehicles(plate, make, model),
+            kyc_verifications(status, updated_at)
+          `,
+        )
+        .is('profiles.deleted_at', null)
+        .order('updated_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (q) {
+        const safe = escapeOrFilter(q);
+        query = query.or(
+          `profiles.full_name.ilike.%${safe}%,profiles.phone.ilike.%${safe}%`,
+        );
+      }
+      if (statusFilter.length > 0) {
+        query = query.in('current_status', statusFilter);
+      }
+
+      const result = await query;
+      if (result.error) throw new Error(result.error.message);
+      return (result.data ?? []) as DriverExportRow[];
+    },
+  });
+
   // Columns — typed as unknown to accommodate mixed column types
   const columns: ColumnDef<DriverRow, unknown>[] = [
     createAvatarColumn<DriverRow>(
@@ -226,10 +323,17 @@ export function DriversListClient() {
         title="Conductores"
         description="Gestión y seguimiento de conductores."
         actions={
-          <Button variant="primary" onClick={() => setNewDrawerOpen(true)}>
-            <Plus size={16} className="mr-1.5" />
-            Nuevo conductor
-          </Button>
+          <div className="flex items-center gap-2">
+            <ExportCsvButton
+              onClick={exportNow}
+              exporting={exporting}
+              emptyHint={totalCount === 0 && !isLoading}
+            />
+            <Button variant="primary" onClick={() => setNewDrawerOpen(true)}>
+              <Plus size={16} className="mr-1.5" />
+              Nuevo conductor
+            </Button>
+          </div>
         }
       />
 

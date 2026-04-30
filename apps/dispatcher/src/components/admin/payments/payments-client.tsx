@@ -7,9 +7,12 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { ColumnDef } from '@tanstack/react-table';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import { useExportCsv } from '@/hooks/use-export-csv';
+import type { CsvColumn } from '@/lib/export-csv';
 import {
   DataTable,
   FilterBar,
+  ExportCsvButton,
   createActionsColumn,
   createDateColumn,
 } from '@/components/admin/data-table';
@@ -397,6 +400,57 @@ export function PaymentsClient() {
   const kpis = useMemo(() => computeKpis(payments), [payments]);
 
   // ---------------------------------------------------------------------------
+  // CSV exports — payments respect filters; webhooks export all rows in tab
+  // ---------------------------------------------------------------------------
+  const paymentCsvColumns: CsvColumn<PaymentRow>[] = [
+    { header: 'ID', accessor: (p) => p.id },
+    { header: 'Ride ID', accessor: (p) => p.ride_id },
+    {
+      header: 'Método',
+      accessor: (p) => (p.method === 'mercadopago' ? 'MercadoPago' : 'Efectivo'),
+    },
+    { header: 'Monto (ARS)', accessor: (p) => p.amount_ars },
+    { header: 'Estado', accessor: (p) => p.status },
+    { header: 'MP Payment ID', accessor: (p) => p.mp_payment_id ?? '' },
+    { header: 'MP Preference ID', accessor: (p) => p.mp_preference_id ?? '' },
+    { header: 'Pagado (UTC)', accessor: (p) => p.paid_at ?? '' },
+  ];
+
+  const { exportNow: exportPayments, exporting: exportingPayments } =
+    useExportCsv<PaymentRow>({
+      filename: 'payments',
+      columns: paymentCsvColumns,
+      // Data is loaded entirely in memory; honor current filters by paginating
+      // over filteredPayments rather than re-querying.
+      fetchPage: async (offset, limit) => {
+        return filteredPayments.slice(offset, offset + limit);
+      },
+    });
+
+  const webhookCsvColumns: CsvColumn<WebhookRow>[] = [
+    { header: 'ID', accessor: (w) => w.id },
+    { header: 'X-Request-ID', accessor: (w) => w.x_request_id ?? '' },
+    { header: 'MP Payment ID', accessor: (w) => w.data_id },
+    { header: 'Acción', accessor: (w) => w.action },
+    {
+      header: 'Firma válida',
+      accessor: (w) => (w.signature_valid ? 'sí' : 'no'),
+    },
+    { header: 'Estado proceso', accessor: (w) => w.processed_status },
+    { header: 'Mensaje error', accessor: (w) => w.error_message ?? '' },
+    { header: 'Recibido (UTC)', accessor: (w) => w.received_at },
+  ];
+
+  const { exportNow: exportWebhooks, exporting: exportingWebhooks } =
+    useExportCsv<WebhookRow>({
+      filename: 'mp-webhooks',
+      columns: webhookCsvColumns,
+      fetchPage: async (offset, limit) => {
+        return webhooks.slice(offset, offset + limit);
+      },
+    });
+
+  // ---------------------------------------------------------------------------
   // Payments columns
   // ---------------------------------------------------------------------------
   const paymentColumns: ColumnDef<PaymentRow, unknown>[] = [
@@ -642,38 +696,48 @@ export function PaymentsClient() {
 
         {/* ---- Tab Pagos ---- */}
         <TabsContent value="pagos" className="space-y-4 mt-4">
-          <FilterBar
-            filters={[
-              {
-                id: 'q',
-                type: 'search',
-                placeholder: 'Buscar por MP ID o Ride ID...',
-              },
-              {
-                id: 'status',
-                type: 'multiselect',
-                label: 'Estado',
-                options: [
-                  { value: 'pending', label: 'Pendiente' },
-                  { value: 'approved', label: 'Aprobado' },
-                  { value: 'refunded', label: 'Reembolsado' },
-                  { value: 'failed', label: 'Fallido' },
-                ],
-              },
-              {
-                id: 'method',
-                type: 'multiselect',
-                label: 'Método',
-                options: [
-                  { value: 'cash', label: 'Efectivo' },
-                  { value: 'mercadopago', label: 'MercadoPago' },
-                ],
-              },
-              { id: 'fecha', type: 'daterange', label: 'Fecha' },
-            ]}
-            value={filters}
-            onChange={setFilters}
-          />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <FilterBar
+                filters={[
+                  {
+                    id: 'q',
+                    type: 'search',
+                    placeholder: 'Buscar por MP ID o Ride ID...',
+                  },
+                  {
+                    id: 'status',
+                    type: 'multiselect',
+                    label: 'Estado',
+                    options: [
+                      { value: 'pending', label: 'Pendiente' },
+                      { value: 'approved', label: 'Aprobado' },
+                      { value: 'refunded', label: 'Reembolsado' },
+                      { value: 'failed', label: 'Fallido' },
+                    ],
+                  },
+                  {
+                    id: 'method',
+                    type: 'multiselect',
+                    label: 'Método',
+                    options: [
+                      { value: 'cash', label: 'Efectivo' },
+                      { value: 'mercadopago', label: 'MercadoPago' },
+                    ],
+                  },
+                  { id: 'fecha', type: 'daterange', label: 'Fecha' },
+                ]}
+                value={filters}
+                onChange={setFilters}
+              />
+            </div>
+            <ExportCsvButton
+              size="sm"
+              onClick={exportPayments}
+              exporting={exportingPayments}
+              emptyHint={filteredPayments.length === 0 && !loading}
+            />
+          </div>
 
           <DataTable
             columns={paymentColumnsWithView}
@@ -689,7 +753,7 @@ export function PaymentsClient() {
         </TabsContent>
 
         {/* ---- Tab Webhooks ---- */}
-        <TabsContent value="webhooks" className="mt-4">
+        <TabsContent value="webhooks" className="space-y-4 mt-4">
           {webhooks.length === 0 && !webhooksLoading ? (
             <Card>
               <CardContent className="py-16 text-center text-sm text-[var(--neutral-500)]">
@@ -697,16 +761,26 @@ export function PaymentsClient() {
               </CardContent>
             </Card>
           ) : (
-            <DataTable
-              columns={webhookColumns}
-              data={webhooks}
-              loading={webhooksLoading}
-              emptyState={
-                <div className="py-16 text-center text-[var(--neutral-500)] text-sm">
-                  No hay webhooks registrados.
-                </div>
-              }
-            />
+            <>
+              <div className="flex justify-end">
+                <ExportCsvButton
+                  size="sm"
+                  onClick={exportWebhooks}
+                  exporting={exportingWebhooks}
+                  emptyHint={webhooks.length === 0 && !webhooksLoading}
+                />
+              </div>
+              <DataTable
+                columns={webhookColumns}
+                data={webhooks}
+                loading={webhooksLoading}
+                emptyState={
+                  <div className="py-16 text-center text-[var(--neutral-500)] text-sm">
+                    No hay webhooks registrados.
+                  </div>
+                }
+              />
+            </>
           )}
         </TabsContent>
       </Tabs>

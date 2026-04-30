@@ -6,9 +6,12 @@ import { Eye, XCircle, Car, CheckCircle, Clock, AlertCircle } from 'lucide-react
 import type { ColumnDef } from '@tanstack/react-table';
 import { useSupabaseQuery } from '@/hooks/use-supabase-query';
 import { useRealtimeTable } from '@/hooks/use-realtime-table';
+import { useExportCsv } from '@/hooks/use-export-csv';
+import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import {
   DataTable,
   FilterBar,
+  ExportCsvButton,
   createStatusColumn,
   createDateColumn,
   createActionsColumn,
@@ -20,6 +23,7 @@ import { StatusPill } from '@/components/ui/status-pill';
 import type { PillVariant } from '@/components/ui/status-pill';
 import { formatARS } from '@/lib/format';
 import { escapeOrFilter } from '@/lib/postgrest-safe';
+import type { CsvColumn } from '@/lib/export-csv';
 
 // ---------------------------------------------------------------------------
 // Status mapping
@@ -224,6 +228,90 @@ export function RidesListClient() {
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   // ---------------------------------------------------------------------------
+  // CSV export — respects current filters (status, payment, fechas, búsqueda)
+  // ---------------------------------------------------------------------------
+  const csvColumns: CsvColumn<RideRow>[] = [
+    { header: 'ID viaje', accessor: (r) => r.id },
+    { header: 'Estado', accessor: (r) => r.status },
+    {
+      header: 'Pasajero',
+      accessor: (r) => r.passengers?.profiles?.full_name ?? '',
+    },
+    {
+      header: 'Teléfono pasajero',
+      accessor: (r) => r.passengers?.profiles?.phone ?? '',
+    },
+    {
+      header: 'Conductor',
+      accessor: (r) => r.drivers?.profiles?.full_name ?? '',
+    },
+    {
+      header: 'Patente',
+      accessor: (r) => r.drivers?.vehicles?.plate ?? '',
+    },
+    { header: 'Origen', accessor: (r) => r.pickup_address ?? '' },
+    { header: 'Destino', accessor: (r) => r.dest_address ?? '' },
+    {
+      header: 'Tarifa estimada (ARS)',
+      accessor: (r) => r.estimated_fare_ars ?? '',
+    },
+    {
+      header: 'Tarifa final (ARS)',
+      accessor: (r) => r.final_fare_ars ?? '',
+    },
+    { header: 'Método de pago', accessor: (r) => r.payment_method ?? '' },
+    { header: 'Estado de pago', accessor: (r) => r.payment_status ?? '' },
+    { header: 'Vehículo solicitado', accessor: (r) => r.vehicle_type_requested ?? '' },
+    { header: 'Pasajeros', accessor: (r) => r.passenger_count ?? '' },
+    { header: 'Canal', accessor: (r) => r.requested_via ?? '' },
+    { header: 'Pedido (UTC)', accessor: (r) => r.requested_at ?? '' },
+    { header: 'Asignado (UTC)', accessor: (r) => r.assigned_at ?? '' },
+  ];
+
+  const { exportNow, exporting } = useExportCsv<RideRow>({
+    filename: 'rides',
+    columns: csvColumns,
+    fetchPage: async (offset, limit) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = getSupabaseBrowserClient() as any;
+      const fromDate = dateFilter.from ?? defaultFrom;
+      const toDate = dateFilter.to ?? defaultTo;
+
+      let query = sb
+        .from('rides')
+        .select(
+          `
+            id, status, requested_at, assigned_at, pickup_address, dest_address,
+            final_fare_ars, estimated_fare_ars, payment_method, payment_status,
+            vehicle_type_requested, passenger_count, requested_via,
+            passengers!rides_passenger_id_fkey(
+              profiles!inner(full_name, phone)
+            ),
+            drivers!rides_driver_id_fkey(
+              profiles!inner(full_name),
+              vehicles(plate)
+            )
+          `,
+        )
+        .gte('requested_at', fromDate + 'T00:00:00')
+        .lte('requested_at', toDate + 'T23:59:59')
+        .order('requested_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (statusFilter.length > 0) query = query.in('status', statusFilter);
+      if (paymentFilter.length > 0) query = query.in('payment_method', paymentFilter);
+      if (q) {
+        const safe = escapeOrFilter(q);
+        query = query.or(`pickup_address.ilike.%${safe}%,dest_address.ilike.%${safe}%`);
+      }
+
+      const result = await query;
+      if (result.error) throw new Error(result.error.message);
+      return (result.data ?? []) as RideRow[];
+    },
+  });
+
+  // ---------------------------------------------------------------------------
   // Columns
   // ---------------------------------------------------------------------------
   const columns: ColumnDef<RideRow, unknown>[] = [
@@ -347,6 +435,13 @@ export function RidesListClient() {
       <PageHeader
         title="Viajes"
         description="Historial completo de viajes, estados y métricas."
+        actions={
+          <ExportCsvButton
+            onClick={exportNow}
+            exporting={exporting}
+            emptyHint={totalCount === 0 && !isLoading}
+          />
+        }
       />
 
       {/* KPI Strip */}
