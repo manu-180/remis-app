@@ -1,5 +1,5 @@
 // ARCHIVO GENERADO AUTOMATICAMENTE
-// Regenerar con: supabase gen types typescript --project-id kmdnsxbpzidpkinlablf
+// Regenerar via: pnpm supabase:types o el MCP de Supabase
 // NO editar manualmente
 
 export type Json =
@@ -935,6 +935,36 @@ export type Database = {
           },
         ]
       }
+      org_settings: {
+        Row: {
+          alert_emails: string[] | null
+          brand_name: string | null
+          id: boolean
+          logo_url: string | null
+          timezone: string | null
+          updated_at: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          alert_emails?: string[] | null
+          brand_name?: string | null
+          id?: boolean
+          logo_url?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          alert_emails?: string[] | null
+          brand_name?: string | null
+          id?: boolean
+          logo_url?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
       passengers: {
         Row: {
           blacklist_reason: string | null
@@ -1695,6 +1725,30 @@ export type Database = {
             }
             Returns: string
           }
+      admin_resolve_kyc: {
+        Args: {
+          p_decision: Database["public"]["Enums"]["kyc_status"]
+          p_notes?: string
+          p_verification_id: string
+        }
+        Returns: {
+          created_at: string
+          driver_id: string
+          id: string
+          metadata: Json | null
+          provider: string
+          score: number | null
+          status: Database["public"]["Enums"]["kyc_status"]
+          updated_at: string
+          verified_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "kyc_verifications"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       assign_ride: {
         Args: {
           p_dispatcher_id: string
@@ -2085,6 +2139,17 @@ export type Database = {
       gettransactionid: { Args: never; Returns: unknown }
       is_admin: { Args: never; Returns: boolean }
       is_dispatcher_or_admin: { Args: never; Returns: boolean }
+      list_staff: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          email: string
+          full_name: string
+          id: string
+          last_sign_in_at: string
+          role: Database["public"]["Enums"]["user_role"]
+        }[]
+      }
       longtransactionsenabled: { Args: never; Returns: boolean }
       pickup_locations_24h: {
         Args: never

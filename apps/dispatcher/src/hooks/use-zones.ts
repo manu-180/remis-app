@@ -77,8 +77,8 @@ export function useZones(): {
 
   const create = useCallback(async (input: CreateZoneInput): Promise<TariffZone> => {
     const supabase = getSupabaseBrowserClient();
-    const { data, error: mutError } = await supabase
-      .from('tariff_zones')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error: mutError } = await (supabase.from('tariff_zones') as any)
       .insert(input)
       .select()
       .single();
@@ -89,8 +89,8 @@ export function useZones(): {
 
   const update = useCallback(async (id: string, input: UpdateZoneInput): Promise<TariffZone> => {
     const supabase = getSupabaseBrowserClient();
-    const { data, error: mutError } = await supabase
-      .from('tariff_zones')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error: mutError } = await (supabase.from('tariff_zones') as any)
       .update(input)
       .eq('id', id)
       .select()

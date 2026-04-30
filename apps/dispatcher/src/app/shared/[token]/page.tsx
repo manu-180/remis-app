@@ -9,7 +9,8 @@ export default async function SharedTripPage({ params }: { params: Promise<{ tok
 
   let trip: SharedTrip | null = null;
   try {
-    const { data, error } = await supabase.rpc('get_shared_trip', { p_token: token });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.rpc as any)('get_shared_trip', { p_token: token });
     if (error || !data) {
       notFound();
     }

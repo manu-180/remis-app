@@ -113,7 +113,8 @@ function PendingCard({ row, onResolved }: PendingCardProps) {
     setLoadingApprove(true);
     try {
       const supabase = getSupabaseBrowserClient();
-      const { error } = await supabase.rpc('admin_resolve_kyc', {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.rpc as any)('admin_resolve_kyc', {
         p_verification_id: row.id,
         p_decision: 'approved',
         p_notes: null,
@@ -137,7 +138,8 @@ function PendingCard({ row, onResolved }: PendingCardProps) {
     setLoadingReject(true);
     try {
       const supabase = getSupabaseBrowserClient();
-      const { error } = await supabase.rpc('admin_resolve_kyc', {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.rpc as any)('admin_resolve_kyc', {
         p_verification_id: row.id,
         p_decision: 'rejected',
         p_notes: reason.trim(),

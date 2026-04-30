@@ -90,15 +90,15 @@ export function useFares(filter: FareFilter = 'current'): {
       const supabase = getSupabaseBrowserClient();
 
       // Close any existing current fare for this origin/dest pair
-      await supabase
-        .from('fares')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase.from('fares') as any)
         .update({ effective_to: new Date().toISOString() })
         .eq('origin_zone_id', input.origin_zone_id)
         .eq('dest_zone_id', input.dest_zone_id)
         .is('effective_to', null);
 
-      const { data, error: insertError } = await supabase
-        .from('fares')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error: insertError } = await (supabase.from('fares') as any)
         .insert({
           origin_zone_id: input.origin_zone_id,
           dest_zone_id: input.dest_zone_id,
@@ -128,7 +128,8 @@ export function useFares(filter: FareFilter = 'current'): {
       at_time?: string;
     }): Promise<EstimateFareResult> => {
       const supabase = getSupabaseBrowserClient();
-      const { data, error: rpcError } = await supabase.rpc('estimate_fare', {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error: rpcError } = await (supabase.rpc as any)('estimate_fare', {
         pickup_lat: params.pickup_lat,
         pickup_lng: params.pickup_lng,
         dest_lat: params.dest_lat,
