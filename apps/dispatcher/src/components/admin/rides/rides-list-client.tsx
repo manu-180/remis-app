@@ -123,32 +123,39 @@ export function RidesListClient() {
     ['rides-stats'],
     async (sb) => {
       const today = todayIso();
-      const [pedidos, completados, cancelados] = await Promise.all([
+      const fromIso = today + 'T00:00:00';
+      const toIso = today + 'T23:59:59';
+      const [pedidos, completados, cancelados, avgRpc] = await Promise.all([
         sb
           .from('rides')
           .select('id', { count: 'exact', head: true })
-          .gte('requested_at', today + 'T00:00:00')
-          .lte('requested_at', today + 'T23:59:59'),
+          .gte('requested_at', fromIso)
+          .lte('requested_at', toIso),
         sb
           .from('rides')
           .select('id', { count: 'exact', head: true })
           .eq('status', 'completed')
-          .gte('requested_at', today + 'T00:00:00')
-          .lte('requested_at', today + 'T23:59:59'),
+          .gte('requested_at', fromIso)
+          .lte('requested_at', toIso),
         sb
           .from('rides')
           .select('id', { count: 'exact', head: true })
           .in('status', ['cancelled_by_passenger', 'cancelled_by_driver', 'cancelled_by_dispatcher', 'no_show'])
-          .gte('requested_at', today + 'T00:00:00')
-          .lte('requested_at', today + 'T23:59:59'),
+          .gte('requested_at', fromIso)
+          .lte('requested_at', toIso),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (sb as any).rpc('get_avg_assign_secs', { p_from: fromIso }),
       ]);
+
+      const avgRaw = avgRpc?.data;
+      const avgNum = avgRaw == null ? null : Number(avgRaw);
 
       return {
         data: {
           pedidosHoy: pedidos.count ?? 0,
           completadosHoy: completados.count ?? 0,
           canceladosHoy: cancelados.count ?? 0,
-          avgAssignSecs: null,
+          avgAssignSecs: Number.isFinite(avgNum) ? avgNum : null,
         },
         error: null,
       };
