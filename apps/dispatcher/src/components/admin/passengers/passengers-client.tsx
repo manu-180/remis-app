@@ -576,34 +576,13 @@ export function PassengersClient() {
     },
   ];
 
-  // Passengers list filters by `query` client-side. We replicate that
-  // filter on the page-by-page fetch to keep CSV in sync with the visible list.
+  // Passengers list is fully loaded in-memory and filtered client-side.
+  // Slice the already-filtered array so the CSV matches what the user sees.
   const passengerExportFetchPage = useCallback(
     async (offset: number, limit: number): Promise<PassengerRow[]> => {
-      let q2 = (supabase as any)
-        .from('passengers')
-        .select(
-          '*, profiles(id, full_name, phone, email, avatar_url, created_at)',
-        )
-        .order('total_rides', { ascending: false })
-        .range(offset, offset + limit - 1);
-
-      if (showBlacklisted) {
-        q2 = q2.eq('blacklisted', true);
-      }
-
-      const { data, error: err } = await q2;
-      if (err) throw new Error(err.message);
-      const rows = (data ?? []) as PassengerRow[];
-      if (!query.trim()) return rows;
-      const needle = query.toLowerCase();
-      return rows.filter((p) => {
-        const name = (p.profiles?.full_name ?? '').toLowerCase();
-        const phone = (p.profiles?.phone ?? '').toLowerCase();
-        return name.includes(needle) || phone.includes(needle);
-      });
+      return filtered.slice(offset, offset + limit);
     },
-    [supabase, query, showBlacklisted],
+    [filtered],
   );
 
   const { exportNow: exportPassengers, exporting: exportingPassengers } =
